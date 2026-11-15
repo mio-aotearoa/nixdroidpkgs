@@ -11,6 +11,7 @@
   androidSdkBuilder,
   fetchpatch,
   gradle_9_7_1,
+  nix-update-script,
 }:
 let
   appPackage =
@@ -27,13 +28,14 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "thunderbird-android";
-      version = "24.0";
+      version = "25.0";
 
       src = fetchFromGitHub {
         owner = "thunderbird";
         repo = "thunderbird-android";
-        tag = "THUNDERBIRD_24_0";
-        hash = "sha256-tSq40mkum5jDfCnUHEjjTWe1s9goVRdzo4260vTYMfs=";
+        name = "thunderbird-${finalAttrs.version}-source";
+        tag = "THUNDERBIRD_${lib.replaceStrings [ "." ] [ "_" ] finalAttrs.version}";
+        hash = "sha256-CMnJk3JoKbsL2u4rNKL0yX8Dw3jlZHhM2loSGRp6nnk=";
       };
 
       patches = [
@@ -59,14 +61,14 @@ let
 
       gradleBuildTask = ":app-thunderbird:assembleFossRelease";
       gradleUpdateTask = finalAttrs.gradleBuildTask;
+      passthru.updateScript = nix-update-script {
+        extraArgs = [
+          "--flake"
+          "--version-regex=^THUNDERBIRD_([0-9]+)_([0-9]+)(?:_([0-9]+))?$"
+        ];
+      };
 
-      # Lock refresh steps:
-      # 1. If Thunderbird bumps Gradle, update `gradle.version` and `gradle.hash`.
-      # 2. Build the updater:
-      #    nix build --impure .#thunderbird.mitmCache.updateScript
-      # 3. Copy the resulting `fetch-deps.sh`, replace its `outPath=` with
-      #    `/home/dev/Documents/repo/app/thunderbird/thunderbird_deps.json`, and run it
-      #    from the repo root.
+      # Update source and regenerate dependencies with nix-update -F -u apk_thunderbird.
       mitmCache = gradle.fetchDeps {
         inherit (finalAttrs) pname;
         attrPath = "apk_thunderbird";

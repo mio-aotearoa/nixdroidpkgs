@@ -17,6 +17,7 @@
   cacert,
   patch,
   unzip,
+  git,
   writeShellScriptBin,
   nix-update,
   jq,
@@ -37,27 +38,28 @@ let
 
   gradle = gradle_9_2_1;
 
-  version = "5.9.0";
+  version = "6.1.0";
   src = fetchFromGitHub {
     owner = "bropines";
     repo = "tailsocks";
+    name = "tailsocks-${version}-source";
     tag = "v${version}";
-    hash = "sha256-vkbYgkslsy52/mGZNMwsSZQSl907ET2eWFcyUHoU3Hk=";
+    hash = "sha256-pYpMgm7sGI+YmyZETagyX5grUGedQbQ3trUK31TLRU4=";
   };
 
-  tailscaleVersion = "1.104.1";
-  # git rev-parse v1.104.1^{}
-  tailscaleCommit = "9a522a9786c97eb7910c01ccb7bd66557b04c910";
-  # git rev-parse v5.4.0^{}
-  appCommit = "92c269069a5212c001a7ff8d7ed8eec8706b58b4";
-  # TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d_%H%M%S v5.4.0^{}
-  appCommitTime = "20261112_063817";
+  tailscaleVersion = "1.104.5";
+  # git rev-parse v1.104.5^{}
+  tailscaleCommit = "73a48057aaf5f60e4f770b398e9b7af576b01dbe";
+  # git rev-parse v6.1.0^{}
+  appCommit = "36c7545dc10d3c750503408f3ebb3b1c560941ad";
+  # TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d_%H%M%S v6.1.0^{}
+  appCommitTime = "20261114_063027";
 
   tailscaleSrc = fetchFromGitHub {
     owner = "tailscale";
     repo = "tailscale";
     tag = "v${tailscaleVersion}";
-    hash = "sha256-f80GVxstQrr8ENP1bseoIpLflQ+QYEisDF8PHzTs7Lg=";
+    hash = "sha256-aq4pBe75wNRFDEa3kSDa/pBLsZws5mOUOjHDUycpmXM=";
   };
 
   hevSocks5Tunnel = fetchFromGitHub {
@@ -95,7 +97,7 @@ let
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-3MgwED5GWRcaXHuD47xFsChgzsMftVNRJtsqTM5BENE=";
+    outputHash = "sha256-wda/pD25IPQ0pPfIbEzJOEGkVpb65Sk9qHozhpkHgz8=";
 
     dontConfigure = true;
     dontFixup = true;
@@ -339,8 +341,9 @@ let
     buildJdk = jdk25_headless;
 
     passthru = {
-      inherit goModCache appctrArtifacts;
+      inherit goModCache appctrArtifacts tailscaleSrc;
       updateDeps = [ "goModCache" ];
+
       updateScript = writeShellScriptBin "update-tailsocks" ''
         set -euo pipefail
         package_file="app/apks/tailsocks/package.nix"
@@ -353,14 +356,15 @@ let
 
         new_version="$(sed -n 's/^[[:space:]]*version = "\([^"]*\)";/\1/p' "$package_file" | head -n 1)"
         tag="v$new_version"
+        src="$(nix build .#apk_tailsocks.src --no-link --print-out-paths)"
 
         auth_header=()
         if [[ -n "''${GITHUB_TOKEN:-}" ]]; then
           auth_header=(-H "Authorization: token $GITHUB_TOKEN")
         fi
-        commit_json="$(${lib.getExe curl} -s "''${auth_header[@]}" "https://api.github.com/repos/bropines/tailsocks/commits/$tag")"
-        app_commit="$(${lib.getExe jq} -r .sha <<< "$commit_json")"
-        commit_date="$(${lib.getExe jq} -r '.commit.committer.date' <<< "$commit_json")"
+        commit_json="$(${lib.getExe curl} --fail --silent --show-error "''${auth_header[@]}" "https://api.github.com/repos/bropines/tailsocks/commits/$tag")"
+        app_commit="$(${lib.getExe jq} -er '.sha | select(test("^[0-9a-f]{40}$"))' <<< "$commit_json")"
+        commit_date="$(${lib.getExe jq} -er '.commit.committer.date | select(test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))' <<< "$commit_json")"
         app_commit_time="$(echo "$commit_date" | tr -d ':-' | sed 's/T/_/' | sed 's/Z//')"
 
         old_commit="$(sed -n 's/^[[:space:]]*appCommit = "\([^"]*\)";/\1/p' "$package_file" | head -n 1)"
@@ -373,7 +377,70 @@ let
           replace_literal "appCommitTime = \"$old_commit_time\";" "appCommitTime = \"$app_commit_time\";"
         fi
 
+        # Keep the Tailscale pin in sync with upstream's TAILSCALE_VERSION.
+        ts_tag="$(tr -d ' \n\r' < "$src/appctr/TAILSCALE_VERSION")"
+        ts_version="''${ts_tag#v}"
+        old_ts_version="$(sed -n 's/^[[:space:]]*tailscaleVersion = "\([^"]*\)";/\1/p' "$package_file" | head -n 1)"
+        if [[ -n "$ts_version" && "$ts_version" != "$old_ts_version" ]]; then
+          replace_literal "tailscaleVersion = \"$old_ts_version\";" "tailscaleVersion = \"$ts_version\";"
+          ts_ref_json="$(${lib.getExe curl} --fail --silent --show-error "''${auth_header[@]}" "https://api.github.com/repos/tailscale/tailscale/git/refs/tags/$ts_tag")"
+          ts_object_sha="$(${lib.getExe jq} -er '.object.sha' <<< "$ts_ref_json")"
+          ts_object_type="$(${lib.getExe jq} -er '.object.type' <<< "$ts_ref_json")"
+          if [[ "$ts_object_type" == "tag" ]]; then
+            ts_tag_json="$(${lib.getExe curl} --fail --silent --show-error "''${auth_header[@]}" "https://api.github.com/repos/tailscale/tailscale/git/tags/$ts_object_sha")"
+            ts_commit="$(${lib.getExe jq} -er '.object.sha | select(test("^[0-9a-f]{40}$"))' <<< "$ts_tag_json")"
+          else
+            ts_commit="$ts_object_sha"
+          fi
+          old_ts_commit="$(sed -n 's/^[[:space:]]*tailscaleCommit = "\([^"]*\)";/\1/p' "$package_file" | head -n 1)"
+          replace_literal "tailscaleCommit = \"$old_ts_commit\";" "tailscaleCommit = \"$ts_commit\";"
+          old_ts_hash="$(nix eval --impure --raw .#apk_tailsocks.tailscaleSrc.outputHash)"
+          replace_literal "$old_ts_hash" "$fake_hash"
+          if ts_log="$(nix build .#apk_tailsocks.tailscaleSrc --no-link 2>&1)"; then
+            replace_literal "$fake_hash" "$old_ts_hash"
+          else
+            new_ts_hash="$(sed -n 's/^ *got: *//p' <<<"$ts_log" | head -n 1)"
+            [[ -n "$new_ts_hash" ]] || { echo "$ts_log" >&2; exit 1; }
+            replace_literal "$fake_hash" "$new_ts_hash"
+          fi
+        fi
+
         refresh_update_deps goModCache
+
+        # refresh_gradle_lock copies the raw source; apply the same git stub
+        # used in preConfigure so Gradle can evaluate outside a git checkout.
+        src_for_lock="$(nix build .#apk_tailsocks.src --no-link --print-out-paths)"
+        lock_tmp="$(mktemp -d)"
+        cp -R "$src_for_lock/." "$lock_tmp/"
+        chmod -R u+w "$lock_tmp"
+        short_commit="$(sed -n 's/^[[:space:]]*appCommit = "\([^"]*\)";/\1/p' "$package_file" | head -n 1 | cut -c1-6)"
+        # Host updateScripts lack stdenv's substituteInPlace; mirror replace_literal.
+        old_git_stub='commandLine("git", "rev-parse", "--short=6", "HEAD")'
+        new_git_stub="commandLine(\"echo\", \"$short_commit\")"
+        gradle_kts="$lock_tmp/app/build.gradle.kts"
+        grep -F -q "$old_git_stub" "$gradle_kts" || {
+          echo "error: git rev-parse stub site missing in $gradle_kts" >&2
+          exit 1
+        }
+        stub_tmp="$(mktemp "$gradle_kts.XXXXXX")"
+        awk -v old="$old_git_stub" -v new="$new_git_stub" '
+          {
+            rest = $0
+            result = ""
+            while ((i = index(rest, old)) > 0) {
+              result = result substr(rest, 1, i - 1) new
+              rest = substr(rest, i + length(old))
+            }
+            print result rest
+          }
+        ' "$gradle_kts" >"$stub_tmp"
+        mv "$stub_tmp" "$gradle_kts"
+        nix develop .#apk_tailsocks -c bash -c '
+          cd "$1"
+          nix run github:tadfisher/gradle2nix/v2 -- --gradle-wrapper="$2"
+        ' bash "$lock_tmp" ${gradle.version}
+        mv "$lock_tmp/gradle.lock" app/apks/tailsocks/gradle.lock
+        rm -rf "$lock_tmp"
       '';
     };
 
@@ -381,6 +448,7 @@ let
       androidSdk
       gradle
       jdk25_headless
+      git
       writableTmpDirAsHomeHook
     ];
 

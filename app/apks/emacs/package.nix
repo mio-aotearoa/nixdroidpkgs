@@ -12,6 +12,7 @@
   ncurses,
   zip,
   which,
+  nix-update-script,
 }:
 let
   appPackage =
@@ -27,17 +28,17 @@ let
       versionCode = "310050029";
       androidAbi = "arm64-v8a";
       minSdk = "29";
-      internalVersion = "31.1";
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "emacs";
-      version = "31.1";
+      version = "31.1.90";
 
       src = fetchFromGitHub {
         owner = "emacs-mirror";
         repo = "emacs";
-        tag = "emacs-31.1";
-        hash = "sha256-lFT5Vt49G17t/fRm5yppO5p9ui10I9JNJVaGO1GPZFI=";
+        name = "emacs-${finalAttrs.version}-source";
+        tag = "emacs-${finalAttrs.version}";
+        hash = "sha256-zpB69k6ECFiKIkpZpkj4Vr0Q5LZZNjI0FhLj0+LSRe8=";
       };
 
       nativeBuildInputs = [
@@ -102,10 +103,17 @@ let
       installPhase = ''
         runHook preInstall
 
-        install -Dm644 "java/emacs-${internalVersion}-${minSdk}-${androidAbi}.apk" "$out/emacs.apk"
+        install -Dm644 "java/emacs-${finalAttrs.version}-${minSdk}-${androidAbi}.apk" "$out/emacs.apk"
 
         runHook postInstall
       '';
+
+      passthru.updateScript = nix-update-script {
+        extraArgs = [
+          "--flake"
+          "--version-regex=^emacs-([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)$"
+        ];
+      };
 
       meta = with lib; {
         description = "GNU Emacs for Android with the Termux shared user ID";

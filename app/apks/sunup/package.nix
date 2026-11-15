@@ -6,33 +6,38 @@
   lib,
   jdk21_headless,
   jdk17_headless,
-  gradle_8_13,
+  gradle_9_7_0,
   fetchFromGitea,
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
   git,
   overrides-fromsrc-updated,
+  nix-update,
+  writeShellScriptBin,
 }:
 let
-  version = "1.3.2";
+  version = "1.3.3";
 
   src = fetchFromGitea {
     domain = "codeberg.org";
     owner = "Sunup";
     repo = "android";
-    rev = version;
-    hash = "sha256-tkkUUEFdYjJEweEsr3XB2mkifsBoSksduQviYJCGoiM=";
+    name = "sunup-${version}-source";
+    tag = version;
+    hash = "sha256-o7RCiMtQjui6xExJOb2F/yntUQlMTt0UpDV+3epz0LY=";
   };
 
   androidSdk = androidSdkBuilder (s: [
     s.cmdline-tools-latest
     s.platform-tools
     s.platforms-android-36
-    s.build-tools-35-0-0
+    s.platforms-android-37-0
+    s.build-tools-36-0-0
+    s.build-tools-37-0-0
   ]);
 
-  gradle = gradle_8_13;
+  gradle = gradle_9_7_0;
 
   appPackage = buildGradlePackage rec {
     pname = "sunup";
@@ -40,14 +45,16 @@ let
 
     lockFile = ./gradle.lock;
     overrides = overrides-fromsrc-updated;
-    buildJdk = jdk17_headless;
+    buildJdk = jdk21_headless;
 
-    postPatch = "";
+    postPatch = ''
+      rm -f gradle/verification-metadata.xml
+    '';
 
     nativeBuildInputs = [
       androidSdk
       gradle
-      jdk17_headless
+      jdk21_headless
 
       writableTmpDirAsHomeHook
       git
@@ -56,10 +63,10 @@ let
     dontUseGradleConfigure = true;
 
     env = {
-      JAVA_HOME = jdk17_headless;
+      JAVA_HOME = jdk21_headless.passthru.home;
       ANDROID_HOME = "${androidSdk}/share/android-sdk";
       ANDROID_SDK_ROOT = "${androidSdk}/share/android-sdk";
-      ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = "${androidSdk}/share/android-sdk/build-tools/35.0.0/aapt2";
+      ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
     };
 
     preConfigure = ''
@@ -74,14 +81,24 @@ let
     gradleFlags = [
       "-x"
       "lintVitalRelease"
-      "-Dorg.gradle.java.home=${jdk17_headless.home}"
+      "-Dorg.gradle.java.home=${jdk21_headless.passthru.home}"
       "-Dorg.gradle.java.installations.auto-download=false"
-      "-Dorg.gradle.java.installations.paths=${jdk17_headless},${jdk21_headless}"
-      "-Dandroid.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/35.0.0/aapt2"
-      "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/35.0.0/aapt2"
+      "-Dorg.gradle.java.installations.paths=${jdk17_headless.passthru.home},${jdk21_headless.passthru.home}"
+      "-Dandroid.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2"
+      "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2"
     ];
 
     gradleBuildFlags = ":app:assembleRelease";
+
+    passthru.updateScript = writeShellScriptBin "update-sunup" ''
+      set -euo pipefail
+      package_file="app/apks/sunup/package.nix"
+      package_attr=".#apk_sunup"
+      fake_hash="${lib.fakeHash}"
+      . "${../_shared/update-script-helpers.sh}"
+      ${lib.getExe nix-update} --flake --src-only apk_sunup
+      refresh_gradle_lock ${gradle.version} app/apks/sunup/gradle.lock
+    '';
 
     installPhase = ''
       runHook preInstall
