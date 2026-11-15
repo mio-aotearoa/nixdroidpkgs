@@ -8,7 +8,6 @@
     launcherVariant = "los";
     bundleLimboTensor = true;
     bundleDroidVM = true;
-    bundleKernelSUManager = false;
     enableUnprotectedKvm = true;
   };
 }

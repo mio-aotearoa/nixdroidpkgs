@@ -17,15 +17,6 @@
       default = false;
       description = "Build and bundle DroidVM as a system app with a dedicated SELinux domain.";
     };
-    bundleKernelSUManager = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = ''
-        Optionally bundle the KernelSU manager. Limbo Tensor and DroidVM no longer
-        need root when bundled with the virtual-machine SELinux policy; keep this
-        for other rooted workflows.
-      '';
-    };
   };
 
   config = lib.mkMerge [
@@ -45,15 +36,6 @@
         packageName = "cn.classfun.droidvm";
         privileged = true;
         apk = "${self.packages.${pkgs.stdenv.hostPlatform.system}.apk_droidvm}/droidvm.apk";
-      };
-    })
-    (lib.mkIf config.bundleKernelSUManager {
-      # wrong. currently kernel ksu module take official key not this key (key for signing the apk)
-      apps.prebuilt.kernelSU = {
-        enable = true;
-        name = "KernelSU";
-        packageName = "me.weishu.kernelsu";
-        apk = "${self.packages.${pkgs.stdenv.hostPlatform.system}.apk_kernelsu}/kernelsu.apk";
       };
     })
   ];

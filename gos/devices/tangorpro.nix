@@ -18,7 +18,6 @@ args@{
   librepodsAirpodsSupport = true;
   bundleLimboTensor = true;
   bundleDroidVM = true;
-  bundleKernelSUManager = true;
   enableUnprotectedKvm = true;
   enableTermuxNix = true;
   device = "tangorpro";
