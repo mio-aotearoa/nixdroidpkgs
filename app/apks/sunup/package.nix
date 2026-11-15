@@ -13,6 +13,7 @@
   androidSdkBuilder,
   git,
   overrides-fromsrc-updated,
+  stdenv,
   nix-update,
   writeShellScriptBin,
 }:
@@ -62,6 +63,9 @@ let
 
     dontUseGradleConfigure = true;
 
+    __darwinAllowLocalNetworking = true;
+    __noChroot = stdenv.hostPlatform.isDarwin;
+
     env = {
       JAVA_HOME = jdk21_headless.passthru.home;
       ANDROID_HOME = "${androidSdk}/share/android-sdk";
@@ -71,11 +75,14 @@ let
 
     preConfigure = ''
       export ANDROID_USER_HOME="$HOME/.android"
+      export ANDROID_SDK_HOME="$HOME"
+      export ANDROID_PREFS_ROOT="$HOME"
       export GRADLE_USER_HOME="$HOME/.gradle"
       export TERM=dumb
       mkdir -p "$ANDROID_USER_HOME"
       echo "sdk.dir=${androidSdk}/share/android-sdk" > local.properties
-      gradleFlagsArray+=(--no-daemon --init-script "$gradleInitScript" --offline)
+      printf "\norg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m\n" >> gradle.properties
+      gradleFlagsArray+=(--no-daemon --no-watch-fs -Dorg.gradle.vfs.watch=false --init-script "$gradleInitScript" --offline)
     '';
 
     gradleFlags = [

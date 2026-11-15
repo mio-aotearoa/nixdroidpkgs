@@ -1,0 +1,212 @@
+diff -ruN limbo-orig/limbo-android-arm/src/main/java/com/limbo/emu/main/arm/LimboEmuActivity.java limbo-new/limbo-android-arm/src/main/java/com/limbo/emu/main/arm/LimboEmuActivity.java
+--- a/limbo-android-arm/src/main/java/com/limbo/emu/main/arm/LimboEmuActivity.java
++++ b/limbo-android-arm/src/main/java/com/limbo/emu/main/arm/LimboEmuActivity.java
+@@ -31,10 +31,16 @@
+     }
+ 
+     protected void loadQEMULib(){
++        // This Nix package builds x86_64-softmmu for Tensor guests; fall back to
++        // the classic arm softmmu names when present.
+         try {
+-            System.loadLibrary("qemu-system-arm");
++            System.loadLibrary("qemu-system-x86_64");
+         } catch (Error ex) {
+-            System.loadLibrary("qemu-system-aarch64");
++            try {
++                System.loadLibrary("qemu-system-arm");
++            } catch (Error ex2) {
++                System.loadLibrary("qemu-system-aarch64");
++            }
+         }
+ 
+     }
+diff -ruN limbo-orig/limbo-android-lib/src/main/java/com/max2idea/android/limbo/jni/VMExecutor.java limbo-new/limbo-android-lib/src/main/java/com/max2idea/android/limbo/jni/VMExecutor.java
+--- a/limbo-android-lib/src/main/java/com/max2idea/android/limbo/jni/VMExecutor.java
++++ b/limbo-android-lib/src/main/java/com/max2idea/android/limbo/jni/VMExecutor.java
+@@ -42,13 +42,9 @@
+ import org.json.JSONObject;
+ 
+ import java.io.File;
+-import java.io.IOException;
+ import java.util.ArrayList;
+ import java.util.Arrays;
+ 
+-import com.topjohnwu.superuser.Shell;
+-
+-
+ 
+ /**
+  * Class is used to start and stop the qemu process and communicate file descriptions, mouse,
+@@ -65,7 +61,6 @@
+     private static int vm_height;
+     //TODO: make this a proper singleton but the views should not be able to access it
+     private static VMExecutor mInstance;
+-    private Shell qemuShell;
+ 
+     VMExecutor(MachineController machineController) {
+         super(machineController);
+@@ -770,39 +765,46 @@
+             QmpClient.setExternal(LimboSettingsManager.getEnableExternalQMP(LimboApplication.getInstance()));
+             String libFilename = getQemuLibrary();
+ 
+-            String BasefileDir = LimboApplication.getBasefileDir();
+-            String qemuExecDir = LimboApplication.getBasefileDir() + "/bin/qemu-system-aarch64";
+-
+-            Shell.cmd("chmod 711 " + qemuExecDir).exec();
+-            Shell.cmd("pwd").exec();
+-
+-            StringBuilder qemuArgv = new StringBuilder();
+-
+-            for (String param : params) {
+-                qemuArgv.append(" ");
+-                qemuArgv.append(param);
+-            }
+-            Log.d(TAG, qemuExecDir + qemuArgv);
+-            Shell.Result result;
+-
+-            if (getMachine().getSetFourCore() == 1){
+-                // this will force qemu run on cpu 0-3, which can make sure firmware can boot successfully
+-                result = Shell.cmd( "taskset f " +qemuExecDir + qemuArgv).exec();
+-            }else{
+-                // normal mode
+-                result = Shell.cmd(qemuExecDir + qemuArgv).exec();
++            // Downstream GrapheneOS builds grant /dev/kvm to limbo_tensor_app, so run
++            // QEMU in-process via JNI like upstream Limbo instead of through su/libsu.
++            // Optional 100% Success Mode still pins this process to CPUs 0-3 without root.
++            if (getMachine().getSetFourCore() == 1) {
++                try {
++                    Log.d(TAG, "Pinning QEMU process to CPUs 0-3 without root");
++                    Runtime.getRuntime().exec(new String[]{
++                            "taskset", "-p", "f",
++                            String.valueOf(android.os.Process.myPid())
++                    }).waitFor();
++                } catch (Exception e) {
++                    Log.w(TAG, "taskset pin failed; continuing without CPU affinity", e);
++                }
+             }
+ 
+-            if (result.isSuccess()){
+-                return "VM shutdown";
+-            }else{
+-                return "QEMU return error!";
++            String libDir = FileUtils.getNativeLibDir(LimboApplication.getInstance());
++            String libPath = libDir + "/" + libFilename;
++            if (!new File(libPath).exists()) {
++                String[] candidates = new String[] {
++                        "libqemu-system-x86_64.so",
++                        "libqemu-system-aarch64.so",
++                        "libqemu-system-arm.so"
++                };
++                for (String candidate : candidates) {
++                    File candidateFile = new File(libDir + "/" + candidate);
++                    if (candidateFile.exists()) {
++                        libFilename = candidate;
++                        libPath = candidateFile.getPath();
++                        break;
++                    }
++                }
+             }
+-
++            res = start(Config.storagedir, LimboApplication.getBasefileDir(),
++                    libFilename, libPath,
++                    Config.SDLHintScale, params);
+         } catch (Exception ex) {
+             ToastUtils.toastLong(LimboApplication.getInstance(), ex.getMessage());
+-            return "1";
++            return res;
+         }
++        return res;
+     }
+ 
+     private void changeVncPass(final Context context, final long delay) {
+@@ -835,23 +837,20 @@
+             @Override
+             public void run() {
+                 if (restart != 0) {
++                    // Restore full CPU affinity without root, then reset via QMP.
+                     try {
+-                        Log.d(TAG, "Trying to use all cpu cores! ");
+-                        Process su = Runtime.getRuntime().exec("su -c set `pidof qemu-system-aarch64` && su -c taskset -pa ff $1");
+-                    } catch (IOException e) {
+-                        e.printStackTrace();
++                        Log.d(TAG, "Restoring all CPU cores without root");
++                        Runtime.getRuntime().exec(new String[]{
++                                "taskset", "-p", "ff",
++                                String.valueOf(android.os.Process.myPid())
++                        }).waitFor();
++                    } catch (Exception e) {
++                        Log.w(TAG, "taskset restore failed", e);
+                     }
++                    QmpClient.sendCommand(QmpClient.getResetCommand());
+                 } else {
+                     //XXX: Qmp command only halts the VM but doesn't exit so we use force close
+-                    //QmpClient.sendCommand(QmpClient.powerDown());
+-                    //stop(restart);
+-                    //need to be smarter here
+-                    try {
+-                        Log.d(TAG, "Killing Qemu process!");
+-                        Process su = Runtime.getRuntime().exec("su -c killall qemu-system-aarch64");
+-                    } catch (IOException e) {
+-                        e.printStackTrace();
+-                    }
++                    stop(restart);
+                 }
+             }
+         }).start();
+diff -ruN limbo-orig/limbo-android-lib/src/main/java/com/max2idea/android/limbo/machine/MachineController.java limbo-new/limbo-android-lib/src/main/java/com/max2idea/android/limbo/machine/MachineController.java
+--- a/limbo-android-lib/src/main/java/com/max2idea/android/limbo/machine/MachineController.java
++++ b/limbo-android-lib/src/main/java/com/max2idea/android/limbo/machine/MachineController.java
+@@ -26,8 +26,6 @@
+ import com.max2idea.android.limbo.files.FileUtils;
+ import com.max2idea.android.limbo.jni.MachineExecutorFactory;
+ import com.max2idea.android.limbo.main.LimboApplication;
+-import com.topjohnwu.superuser.Shell;
+-
+ import java.util.ArrayList;
+ import java.util.HashSet;
+ import java.util.Observer;
+@@ -120,7 +118,6 @@
+     }
+ 
+     void stopvm() {
+-        //Shell.cmd("killall qemu-system-aarch64").exec();
+         machineExecutor.stopvm(0);
+     }
+ 
+diff -ruN limbo-orig/limbo-android-lib/src/main/java/com/max2idea/android/limbo/main/LimboApplication.java limbo-new/limbo-android-lib/src/main/java/com/max2idea/android/limbo/main/LimboApplication.java
+--- a/limbo-android-lib/src/main/java/com/max2idea/android/limbo/main/LimboApplication.java
++++ b/limbo-android-lib/src/main/java/com/max2idea/android/limbo/main/LimboApplication.java
+@@ -36,9 +36,6 @@
+ import java.io.File;
+ import java.io.IOException;
+ 
+-import com.topjohnwu.superuser.Shell;
+-
+-
+ /**
+  * We use the application context for the initiliazation of some of the Storage and
+  * Controller implementations.
+@@ -171,23 +168,11 @@
+         return limboVersion;
+     }
+ 
+-    static {
+-        // Set settings before the main shell can be created
+-        Shell.enableVerboseLogging = true;
+-        Shell.setDefaultBuilder(Shell.Builder.create()
+-                .setFlags(Shell.FLAG_REDIRECT_STDERR)
+-                .setTimeout(10)
+-        );
+-    }
+-
+     @Override
+     public void onCreate() {
+ 
+         super.onCreate();
+         sInstance = this;
+-        Shell.getShell(shell -> {
+-
+-        });
+         try {
+             Class.forName("android.os.AsyncTask");
+         } catch (Throwable ignore) {

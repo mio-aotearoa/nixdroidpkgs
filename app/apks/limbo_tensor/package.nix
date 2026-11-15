@@ -93,13 +93,17 @@ let
     s.ndk-26-3-11579264
   ]);
   ndk = "${androidSdk}/share/android-sdk/ndk/26.3.11579264";
-  sysroot = "${ndk}/toolchains/llvm/prebuilt/linux-x86_64/sysroot";
+  ndkHostTag = if stdenv.hostPlatform.isDarwin then "darwin-x86_64" else "linux-x86_64";
+  sysroot = "${ndk}/toolchains/llvm/prebuilt/${ndkHostTag}/sysroot";
   gradle = gradle_7_2;
 
   nativeRuntime = stdenv.mkDerivation {
     pname = "limbo-tensor-native-runtime";
     inherit version src;
     sourceRoot = "${src.name}";
+
+    __darwinAllowLocalNetworking = true;
+    __noChroot = stdenv.hostPlatform.isDarwin;
 
     nativeBuildInputs = [
       androidSdk
@@ -253,13 +257,16 @@ let
       description = "Limbo Tensor QEMU runtime built from source";
       homepage = "https://github.com/wasdwasd0105/limbo_tensor";
       license = lib.licenses.gpl2Only;
-      platforms = lib.platforms.linux;
+      platforms = lib.platforms.unix;
     };
   };
 
   appPackage = buildGradlePackage (finalAttrs: {
     pname = "limbo-tensor";
     inherit version src gradle;
+
+    __darwinAllowLocalNetworking = true;
+    __noChroot = stdenv.hostPlatform.isDarwin;
     passthru = { inherit nativeRuntime; };
     sourceRoot = "${src.name}";
     gradleBuildFlags = [ ":limbo-android-arm:assembleRelease" ];
@@ -286,6 +293,9 @@ let
     postPatch = ''
             # Upstream Limbo Tensor (GPL-2.0-only):
             # https://github.com/wasdwasd0105/limbo_tensor
+      # Run QEMU in-process via JNI so the limbo_tensor_app SELinux domain can
+      # open /dev/kvm without KernelSU/root (see gos/virtual-machine-sepolicy.patch).
+      patch -p1 < ${./no-root-kvm.patch}
       substituteInPlace build.gradle \
         --replace-fail 'jcenter()' 'mavenCentral()'
       substituteInPlace limbo-android-arm/build.gradle \
@@ -321,6 +331,9 @@ let
       "-Dorg.gradle.java.installations.paths=${jdk11_headless.passthru.home}"
       "-Dandroid.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/30.0.3/aapt2"
       "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/30.0.3/aapt2"
+      "--no-daemon"
+      "--no-watch-fs"
+      "-Dorg.gradle.vfs.watch=false"
     ];
     enableParallelBuilding = false;
 
@@ -343,7 +356,7 @@ let
       description = "QEMU and KVM virtual machine manager for Tensor devices, built from source";
       homepage = "https://github.com/wasdwasd0105/limbo_tensor";
       license = licenses.gpl2Only;
-      platforms = platforms.linux;
+      platforms = platforms.unix;
     };
   });
 in

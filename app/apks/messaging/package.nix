@@ -53,6 +53,14 @@ let
       ./webdav-sync.patch
       # Allow copying the text of multiple selected messages at once.
       ./multi-select-copy.patch
+      # Conversation + message text search (#458 + #467). Prefer .diff over .patch:
+      # the PR is two commits and mailbox .patch fails under patch(1)/fetchpatch.
+      # Prefer over #427 (dirty competing implementation). #457 already on main.
+      (fetchpatch {
+        name = "Search conversations and messages";
+        url = "https://github.com/GrapheneOS/Messaging/pull/467.diff";
+        hash = "sha256-8x/7D+rpOnDqnhbvdi7JNJQFRSPCh3AutK5dAFACLEE=";
+      })
       # TODO # ./copy-verification-code.patch
       /*
         (fetchpatch {

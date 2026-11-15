@@ -17,11 +17,6 @@
       default = false;
       description = "Build and bundle DroidVM as a system app with a dedicated SELinux domain.";
     };
-    bundleKernelSUManager = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = "Build and bundle the KernelSU manager so the user can approve VM apps for root access.";
-    };
   };
 
   config = lib.mkMerge [
@@ -41,14 +36,6 @@
         packageName = "cn.classfun.droidvm";
         privileged = true;
         apk = "${self.packages.${pkgs.stdenv.hostPlatform.system}.apk_droidvm}/droidvm.apk";
-      };
-    })
-    (lib.mkIf config.bundleKernelSUManager {
-      apps.prebuilt.kernelSU = {
-        enable = true;
-        name = "KernelSU";
-        packageName = "me.weishu.kernelsu";
-        apk = "${self.packages.${pkgs.stdenv.hostPlatform.system}.apk_kernelsu}/kernelsu.apk";
       };
     })
   ];

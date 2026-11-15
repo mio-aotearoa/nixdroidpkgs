@@ -60,7 +60,11 @@ let
     lockFile = mergeLock [ ./gradle.lock ];
     overrides = overrides-fromsrc;
     buildJdk = jdk21_headless;
-    patches = [ ./build-sdk.patch ];
+    patches = [
+      ./build-sdk.patch
+      # Prefer the app UID when SELinux grants /dev/kvm (no KernelSU/root).
+      ./no-root-kvm.patch
+    ];
     gradleBuildFlags = ":app:assembleRelease";
 
     postPatch = ''
