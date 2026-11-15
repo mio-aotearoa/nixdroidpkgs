@@ -5,7 +5,7 @@
   ];
   config = {
     device = "komodo";
-    #launcherVariant = "los";
+    launcherVariant = "los";
     bundleLimboTensor = true;
     bundleDroidVM = true;
     bundleKernelSUManager = false;
