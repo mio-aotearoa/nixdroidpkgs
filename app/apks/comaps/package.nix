@@ -109,20 +109,20 @@ let
       # CoMaps CMake requires python protobuf >=3.20 and <4.0.
       # Nixpkgs default protobuf is 7.x, so provide a compatible interpreter.
       prePatch = ''
-        export PATH="${pythonWithProtobuf}/bin:$PATH"
-        substituteInPlace ../tools/unix/version.sh \
-          --replace-fail '    local COUNT_AND_DATE=( 0 $(date +%Y.%m.%d) )' \
-            '    local COUNT_AND_DATE=( ${versionCount} ${versionDate} )'
-        substituteInPlace ../CMakeLists.txt \
-          --replace-fail 'find_package(Python3 REQUIRED COMPONENTS Interpreter)' \
-            'set(Python3_EXECUTABLE "${pythonWithProtobuf}/bin/python3" CACHE FILEPATH "" FORCE)
-find_package(Python3 REQUIRED COMPONENTS Interpreter)' \
-          --replace-fail 'if(PROTOBUF_VERSION VERSION_LESS "3.20.0" OR PROTOBUF_VERSION VERSION_GREATER_EQUAL "4.0.0")' \
-            'if(PROTOBUF_VERSION VERSION_LESS "3.20.0" OR PROTOBUF_VERSION VERSION_GREATER_EQUAL "5.0.0")' \
-          --replace-fail 'version (>=3.20, <4.0) is required' \
-            'version (>=3.20, <5.0) is required' \
-          --replace-fail 'found (>=3.20, <4.0)' \
-            'found (>=3.20, <5.0)'
+                export PATH="${pythonWithProtobuf}/bin:$PATH"
+                substituteInPlace ../tools/unix/version.sh \
+                  --replace-fail '    local COUNT_AND_DATE=( 0 $(date +%Y.%m.%d) )' \
+                    '    local COUNT_AND_DATE=( ${versionCount} ${versionDate} )'
+                substituteInPlace ../CMakeLists.txt \
+                  --replace-fail 'find_package(Python3 REQUIRED COMPONENTS Interpreter)' \
+                    'set(Python3_EXECUTABLE "${pythonWithProtobuf}/bin/python3" CACHE FILEPATH "" FORCE)
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)' \
+                  --replace-fail 'if(PROTOBUF_VERSION VERSION_LESS "3.20.0" OR PROTOBUF_VERSION VERSION_GREATER_EQUAL "4.0.0")' \
+                    'if(PROTOBUF_VERSION VERSION_LESS "3.20.0" OR PROTOBUF_VERSION VERSION_GREATER_EQUAL "5.0.0")' \
+                  --replace-fail 'version (>=3.20, <4.0) is required' \
+                    'version (>=3.20, <5.0) is required' \
+                  --replace-fail 'found (>=3.20, <4.0)' \
+                    'found (>=3.20, <5.0)'
       '';
 
       postUnpack = ''

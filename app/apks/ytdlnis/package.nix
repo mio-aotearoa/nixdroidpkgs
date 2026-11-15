@@ -72,18 +72,18 @@ let
       '';
 
       preConfigure = ''
-        export HOME="$TMPDIR/home"
-        export ANDROID_USER_HOME="$HOME/.android"
-        mkdir -p "$ANDROID_USER_HOME"
-        mkdir -p "$HOME/.gradle"
-        echo "sdk.dir=${androidSdk}/share/android-sdk" > local.properties
-        touch keystore.properties
+                export HOME="$TMPDIR/home"
+                export ANDROID_USER_HOME="$HOME/.android"
+                mkdir -p "$ANDROID_USER_HOME"
+                mkdir -p "$HOME/.gradle"
+                echo "sdk.dir=${androidSdk}/share/android-sdk" > local.properties
+                touch keystore.properties
 
-        cat >> gradle.properties <<EOF
-systemProp.user.home=$HOME
-systemProp.android.user.home=$ANDROID_USER_HOME
-org.gradle.jvmargs=-Xmx4096m -Duser.home=$HOME -Dandroid.user.home=$ANDROID_USER_HOME
-EOF
+                cat >> gradle.properties <<EOF
+        systemProp.user.home=$HOME
+        systemProp.android.user.home=$ANDROID_USER_HOME
+        org.gradle.jvmargs=-Xmx4096m -Duser.home=$HOME -Dandroid.user.home=$ANDROID_USER_HOME
+        EOF
       '';
 
       gradleFlags = [
@@ -93,7 +93,8 @@ EOF
         "-Dorg.gradle.java.installations.paths=${jdk21_headless.passthru.home}"
         "-Dandroid.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/36.1.0/aapt2"
         "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/36.1.0/aapt2"
-      ] ++ lib.optionals stdenv.hostPlatform.isDarwin [
+      ]
+      ++ lib.optionals stdenv.hostPlatform.isDarwin [
         "--no-daemon"
         "--no-watch-fs"
         "-Dorg.gradle.vfs.watch=false"
