@@ -26,7 +26,7 @@ let
       # tarballs instead so the sandboxed build stays offline.
       llamadartNativeAndroidArm64 = fetchurl {
         url = "https://github.com/leehack/llamadart-native/releases/download/v0.4.1/llamadart-native-android-arm64-v0.4.1.tar.gz";
-        hash = "sha256-NIwNhGLAqLJTtUBra047em1JY7b+eRv/lgyTwh0Gsbg=";
+        hash = "sha256-/KUvYl4Za09dU7XcvpZGtrdkHu29f2GrEnLd1ewKnuQ=";
       };
 
       llamadartNativeAndroidX64 = fetchurl {
