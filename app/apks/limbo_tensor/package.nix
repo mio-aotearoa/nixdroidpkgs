@@ -293,6 +293,9 @@ let
     postPatch = ''
             # Upstream Limbo Tensor (GPL-2.0-only):
             # https://github.com/wasdwasd0105/limbo_tensor
+      # Run QEMU in-process via JNI so the limbo_tensor_app SELinux domain can
+      # open /dev/kvm without KernelSU/root (see gos/virtual-machine-sepolicy.patch).
+      patch -p1 < ${./no-root-kvm.patch}
       substituteInPlace build.gradle \
         --replace-fail 'jcenter()' 'mavenCentral()'
       substituteInPlace limbo-android-arm/build.gradle \

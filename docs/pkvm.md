@@ -11,9 +11,11 @@ is to use the bootloader: run `fastboot oem pkvm enable`, then
 `fastboot oem cmdline show`. Remove it with
 `fastboot oem cmdline del kvm-arm.mode=nvhe`.
 
-Limbo and DroidVM both require root to access the KVM device. Bundling either
-APK as a privileged application does not grant root or bypass SELinux device
-node access controls. DroidVM additionally needs a supported backend exposed
+When `bundleLimboTensor` or `bundleDroidVM` is enabled, GrapheneOS gets a
+dedicated SELinux domain for each app (`limbo_tensor_app` / `droidvm_app`) that
+can open `/dev/kvm`. The bundled APKs are patched to run their QEMU/helpers as
+the app UID instead of through `su`, so `bundleKernelSUManager` is not required
+for those two emulators. DroidVM additionally needs a supported backend exposed
 by the device (`/dev/kvm`, `/dev/gunyah`, or `/dev/gzvm`). The bootloader method
 and this kernel option only change KVM mode; they do not grant app root access.
 

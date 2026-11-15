@@ -1,0 +1,156 @@
+diff -ruN droid-orig/app/src/main/java/cn/classfun/droidvm/lib/utils/RunUtils.java droid-new/app/src/main/java/cn/classfun/droidvm/lib/utils/RunUtils.java
+--- a/app/src/main/java/cn/classfun/droidvm/lib/utils/RunUtils.java
++++ b/app/src/main/java/cn/classfun/droidvm/lib/utils/RunUtils.java
+@@ -19,11 +19,39 @@
+     private RunUtils() {
+     }
+ 
++    private static Boolean appKvmAccess = null;
++
++    /** True when this app can open /dev/kvm without su (downstream SELinux). */
++    public static boolean canAccessKvmWithoutRoot() {
++        if (appKvmAccess != null) return appKvmAccess;
++        try {
++            // /dev/kvm is world-accessible on AOSP; SELinux is what normally blocks apps.
++            // Downstream GrapheneOS policy allows droidvm_app to open it without su.
++            var kvm = new java.io.RandomAccessFile("/dev/kvm", "rw");
++            kvm.close();
++            appKvmAccess = true;
++        } catch (Exception e) {
++            appKvmAccess = false;
++        }
++        return appKvmAccess;
++    }
++
++    /** Prefer a normal shell when KVM works without root; keep su for rooted installs. */
++    @NonNull
++    public static String preferredShellBinary() {
++        if (Os.getuid() == 0 || canAccessKvmWithoutRoot())
++            return FileUtils.findExecute("sh", "/system/bin/sh");
++        return FileUtils.findExecute("su", "/system/bin/su");
++    }
++
+     @NonNull
+     private static RunContext getContext() {
+-        return (Os.getuid() == 0) ?
+-            SystemRunContext.getContext() :
+-            RootRunContext.getContext();
++        if (Os.getuid() == 0)
++            return SystemRunContext.getContext();
++        // Prefer the app UID when SELinux already grants KVM access.
++        if (canAccessKvmWithoutRoot())
++            return SystemRunContext.getContext();
++        return RootRunContext.getContext();
+     }
+ 
+     @NonNull
+diff -ruN droid-orig/app/src/main/java/cn/classfun/droidvm/ui/disk/operation/DiskOperationActivity.java droid-new/app/src/main/java/cn/classfun/droidvm/ui/disk/operation/DiskOperationActivity.java
+--- a/app/src/main/java/cn/classfun/droidvm/ui/disk/operation/DiskOperationActivity.java
++++ b/app/src/main/java/cn/classfun/droidvm/ui/disk/operation/DiskOperationActivity.java
+@@ -2,7 +2,7 @@
+ 
+ import static android.view.View.GONE;
+ import static android.view.View.VISIBLE;
+-import static cn.classfun.droidvm.lib.utils.FileUtils.findExecute;
++import static cn.classfun.droidvm.lib.utils.RunUtils.preferredShellBinary;
+ import static cn.classfun.droidvm.lib.utils.ProcessUtils.SIGINT;
+ import static cn.classfun.droidvm.lib.utils.ProcessUtils.shellKillProcess;
+ import static cn.classfun.droidvm.lib.utils.StringUtils.basename;
+@@ -186,9 +186,9 @@
+     }
+ 
+     private void startTerminalSession(String cmd) {
+-        var shell = findExecute("su", "/system/bin/su");
++        var shell = preferredShellBinary();
+         var cwd = getFilesDir().getAbsolutePath();
+-        var args = new String[]{"su", "-c", cmd};
++        var args = new String[]{shell, "-c", cmd};
+         var env = new String[]{
+             "TERM=xterm-256color",
+             "PATH=/system/bin",
+diff -ruN droid-orig/app/src/main/java/cn/classfun/droidvm/ui/logs/LogsActivity.java droid-new/app/src/main/java/cn/classfun/droidvm/ui/logs/LogsActivity.java
+--- a/app/src/main/java/cn/classfun/droidvm/ui/logs/LogsActivity.java
++++ b/app/src/main/java/cn/classfun/droidvm/ui/logs/LogsActivity.java
+@@ -1,6 +1,6 @@
+ package cn.classfun.droidvm.ui.logs;
+ 
+-import static cn.classfun.droidvm.lib.utils.FileUtils.findExecute;
++import static cn.classfun.droidvm.lib.utils.RunUtils.preferredShellBinary;
+ import static cn.classfun.droidvm.lib.utils.StringUtils.fmt;
+ 
+ import android.net.Uri;
+@@ -134,7 +134,7 @@
+             var pid = DaemonHelper.readPid();
+             if (pid < 0) throw new RuntimeException("Daemon is not running");
+             var cmd = fmt("logcat --pid=%d", pid);
+-            var shell = findExecute("su", "/system/bin/su");
++            var shell = preferredShellBinary();
+             var builder = new ProcessBuilder(shell, "-c", cmd);
+             builder.redirectErrorStream(true);
+             logcatProcess = builder.start();
+diff -ruN droid-orig/app/src/main/java/cn/classfun/droidvm/ui/setup/step/RootStepFragment.java droid-new/app/src/main/java/cn/classfun/droidvm/ui/setup/step/RootStepFragment.java
+--- a/app/src/main/java/cn/classfun/droidvm/ui/setup/step/RootStepFragment.java
++++ b/app/src/main/java/cn/classfun/droidvm/ui/setup/step/RootStepFragment.java
+@@ -19,6 +19,7 @@
+ import com.topjohnwu.superuser.internal.MainShell;
+ 
+ import cn.classfun.droidvm.R;
++import cn.classfun.droidvm.lib.utils.RunUtils;
+ import cn.classfun.droidvm.ui.setup.SetupActivity;
+ import cn.classfun.droidvm.ui.setup.base.BaseCheckStepFragment;
+ 
+@@ -67,14 +68,21 @@
+             Log.w(TAG, "Failed to get root shell", e);
+         }
+         var isRoot = shell.isRoot();
++        // Downstream GrapheneOS builds can open /dev/kvm as droidvm_app without su.
++        // Treat that as enough privilege to continue setup and extract helpers.
++        var kvmOk = !isRoot && RunUtils.canAccessKvmWithoutRoot();
++        var privileged = isRoot || kvmOk;
+         var kernel = runList("uname", "-r").getOutString();
+         var secontext = runList("id", "-Z").getOutString();
+-        Log.i(TAG, fmt("Root: %s kernel: %s selinux: %s", isRoot, kernel, secontext));
+-        putData("isRoot", isRoot);
++        Log.i(TAG, fmt(
++            "Root: %s kvmWithoutRoot: %s kernel: %s selinux: %s",
++            isRoot, kvmOk, kernel, secontext
++        ));
++        putData("isRoot", privileged);
+         triggerEvent("rootCheckDone");
+         activity.runOnUiThread(() -> {
+             if (!isAdded()) return;
+-            if (isRoot) {
++            if (privileged) {
+                 showSuccess(R.string.setup_root_title, R.string.setup_root_success);
+             } else {
+                 showError(R.string.setup_root_title, R.string.setup_root_fail);
+diff -ruN droid-orig/app/src/main/java/cn/classfun/droidvm/ui/vm/console/VMConsoleActivity.java droid-new/app/src/main/java/cn/classfun/droidvm/ui/vm/console/VMConsoleActivity.java
+--- a/app/src/main/java/cn/classfun/droidvm/ui/vm/console/VMConsoleActivity.java
++++ b/app/src/main/java/cn/classfun/droidvm/ui/vm/console/VMConsoleActivity.java
+@@ -4,7 +4,7 @@
+ import static android.view.KeyEvent.*;
+ import static android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT;
+ import static cn.classfun.droidvm.lib.utils.AssetUtils.getAssetBinaryPath;
+-import static cn.classfun.droidvm.lib.utils.FileUtils.findExecute;
++import static cn.classfun.droidvm.lib.utils.RunUtils.preferredShellBinary;
+ import static cn.classfun.droidvm.lib.utils.ProcessUtils.shellKillProcess;
+ import static cn.classfun.droidvm.lib.utils.RunUtils.escapedString;
+ import static cn.classfun.droidvm.lib.utils.StringUtils.fmt;
+@@ -112,7 +112,7 @@
+         terminalView = findViewById(R.id.terminal_view);
+         terminalView.setTerminalViewClient(viewClient);
+         var consoleBin = getAssetBinaryPath("droidvm");
+-        var shell = findExecute("su", "/system/bin/su");
++        var shell = preferredShellBinary();
+         var cwd = getFilesDir().getAbsolutePath();
+         var cmd = fmt(
+             "%s console %s %s",
+@@ -120,7 +120,7 @@
+             escapedString(vmId),
+             escapedString(streamName)
+         );
+-        var args = new String[]{"su", "-c", cmd};
++        var args = new String[]{shell, "-c", cmd};
+         var env = new String[]{
+             "TERM=xterm-256color",
+             "PATH=/system/bin",

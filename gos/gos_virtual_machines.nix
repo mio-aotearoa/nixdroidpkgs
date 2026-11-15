@@ -20,7 +20,11 @@
     bundleKernelSUManager = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Build and bundle the KernelSU manager so the user can approve VM apps for root access.";
+      description = ''
+        Optionally bundle the KernelSU manager. Limbo Tensor and DroidVM no longer
+        need root when bundled with the virtual-machine SELinux policy; keep this
+        for other rooted workflows.
+      '';
     };
   };
 
