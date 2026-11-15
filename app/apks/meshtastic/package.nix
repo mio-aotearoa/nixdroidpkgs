@@ -11,6 +11,7 @@
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
   git,
+  nix-update-script,
 }:
 let
   appPackage =
@@ -27,13 +28,14 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "meshtastic";
-      version = "2.8.3";
+      version = "2.8.4";
 
       src = fetchFromGitHub {
         owner = "meshtastic";
         repo = "Meshtastic-Android";
+        name = "meshtastic-${finalAttrs.version}-source";
         tag = "v${finalAttrs.version}";
-        hash = "sha256-zFALkEyISYb6u294lyop7pqYP3ZA7Lh0yz5qsWzz3rE=";
+        hash = "sha256-JkQNG9p9mvEC72LqMVGtukoY2Shl05aJNKLQKRCPMdE=";
         fetchSubmodules = true;
       };
 
@@ -56,13 +58,15 @@ let
 
       gradleBuildTask = ":androidApp:assembleFdroidRelease";
       gradleUpdateTask = finalAttrs.gradleBuildTask;
+      passthru.updateScript = nix-update-script {
+        extraArgs = [
+          "--flake"
+          "--use-github-releases"
+          "--version-regex=^v?([0-9]+\\.[0-9]+\\.[0-9]+)$"
+        ];
+      };
 
-      # Lock refresh steps:
-      # 1. If Meshtastic bumps Gradle, update `gradle.version` and `gradle.hash`.
-      # 2. Build the updater:
-      #    nix build --impure .#meshtastic.mitmCache.updateScript
-      # 3. Copy the resulting `fetch-deps.sh`, replace its `outPath=` with
-      #    `/home/dev/Documents/repo/meshtastic_deps.json`, and run it from the repo root.
+      # Update source and regenerate dependencies with nix-update -F -u apk_meshtastic.
       mitmCache = gradle.fetchDeps {
         inherit (finalAttrs) pname;
         pkg = finalAttrs.finalPackage;

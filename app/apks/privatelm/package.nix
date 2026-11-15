@@ -12,6 +12,8 @@
   androidSdkBuilder,
   git,
   shaderc,
+  nix-update,
+  writeShellScriptBin,
 }:
 let
   flutterApkHelpers = ../_shared/flutter-apk-helpers.sh;
@@ -82,17 +84,36 @@ let
     in
     buildDartApplication.override { dart = flutter344; } (finalAttrs: {
       pname = "privatelm";
-      version = "1.0.7+7";
+      version = "1.0.7-cluster";
 
       src = fetchFromGitHub {
         owner = "orailnoor";
         repo = "cross-platform-llm-client";
-        rev = "main";
-        hash = "sha256-pSAfmWUhu0gU0ueFaCx976hBNltr2+tX70hmoIMwRcs=";
+        name = "privatelm-${finalAttrs.version}-source";
+        tag = finalAttrs.version;
+        hash = "sha256-tndfnJ6Lxtz1upZNI/IjwEo/lkspqpihG21LbnXZxN4=";
       };
 
       pubspecLock = lib.importJSON ./pubspec.lock.json;
       gitHashes = { };
+
+      passthru.updateScript = writeShellScriptBin "update-privatelm" ''
+        set -euo pipefail
+        ${lib.getExe nix-update} --flake --src-only --use-github-releases apk_privatelm "$@"
+        src="$(nix build .#apk_privatelm.src --no-link --print-out-paths)"
+        ${pythonWithYaml}/bin/python - "$src/pubspec.lock" app/apks/privatelm/pubspec.lock.json <<'PY'
+        import json
+        import sys
+        import yaml
+
+        with open(sys.argv[1]) as source:
+            lock = yaml.safe_load(source)
+        with open(sys.argv[2], "w") as target:
+            json.dump(lock, target)
+            target.write("\n")
+        PY
+        "$(nix build .#apk_privatelm.mitmCache.updateScript --no-link --print-out-paths)"
+      '';
 
       sdkSourceBuilders = {
         flutter = mkFlutterSdkSourceBuilder {

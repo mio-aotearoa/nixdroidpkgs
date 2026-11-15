@@ -1,6 +1,7 @@
 {
   mk-apk-package,
   lib,
+  path,
   buildDartApplication,
   runCommand,
   fetchFromGitHub,
@@ -16,6 +17,8 @@
   zip,
   fetchurl,
   stdenv,
+  symlinkJoin,
+  rustPlatform,
   writeScript,
   writeShellScriptBin,
   nix-update,
@@ -44,6 +47,42 @@ let
 
       gradle = gradle_8_14_3;
 
+      androidCrossConfig = {
+        config.allowUnfree = true;
+        localSystem = stdenv.buildPlatform.system;
+      };
+
+      mkAndroidPkgs =
+        {
+          config,
+          rustTarget,
+        }:
+        import path (
+          androidCrossConfig
+          // {
+            crossSystem = {
+              inherit config;
+              androidSdkVersion = "35";
+              androidNdkVersion = "29";
+              useAndroidPrebuilt = true;
+              rust.rustcTarget = rustTarget;
+            };
+          }
+        );
+
+      aarch64AndroidPkgs = mkAndroidPkgs {
+        config = "aarch64-unknown-linux-android";
+        rustTarget = "aarch64-linux-android";
+      };
+      armv7AndroidPkgs = mkAndroidPkgs {
+        config = "armv7a-unknown-linux-androideabi";
+        rustTarget = "armv7-linux-androideabi";
+      };
+      x86_64AndroidPkgs = mkAndroidPkgs {
+        config = "x86_64-unknown-linux-android";
+        rustTarget = "x86_64-linux-android";
+      };
+
       gradleZip =
         runCommand "gradle-${gradle.version}-wrapper.zip"
           {
@@ -67,446 +106,563 @@ let
         "-Dorg.gradle.project.android.aapt2FromMavenOverride=${aapt2Path}"
       ];
     in
-    buildDartApplication.override { dart = flutter347; } (finalAttrs: {
-      pname = "immich";
-      version = "3.4.1";
+    buildDartApplication.override { dart = flutter347; } (
+      finalAttrs:
+      let
+        # Immich 3.4+ ships a Rust native_core hook that calls rustup. Build the
+        # Android .so files in Nix and feed them through a stub Dart build hook.
+        nativeCargoDeps = rustPlatform.fetchCargoVendor {
+          pname = "immich-native-core";
+          inherit (finalAttrs) version;
+          src = finalAttrs.baseSrc;
+          cargoRoot = "native";
+          hash = "sha256-JU0ruX80yZQssOf8/gQ5pRy3vLHVsq5w0P+enn1iiHY=";
+        };
 
-      baseSrc = fetchFromGitHub {
-        owner = "immich-app";
-        repo = "immich";
-        tag = "v${finalAttrs.version}";
-        fetchSubmodules = true;
-        hash = "sha256-0B4oEMhpp5coy4fXGTgirVeYA1d2YfYYQShkFE2AQK0=";
-      };
+        mkNativeCoreFfiLib =
+          {
+            crossPkgs,
+            rustTarget,
+            abi,
+          }:
+          crossPkgs.rustPlatform.buildRustPackage {
+            pname = "immich-native-core-ffi-${abi}";
+            inherit (finalAttrs) version;
+            src = finalAttrs.baseSrc;
 
-      src = applyPatches {
-        src = finalAttrs.baseSrc;
-        # v3.2.0 moved the OpenAPI Dart client to gitignored generated/openapi.
-        nativeBuildInputs = [ openapi-generator-cli ];
-        postPatch = ''
-          (
-            cd open-api
-            bash ./bin/generate-dart-sdk.sh
-          )
-          test -f mobile/generated/openapi/pubspec.yaml
-        '';
-      };
+            sourceRoot = "${finalAttrs.baseSrc.name}/native";
+            cargoDeps = nativeCargoDeps;
+            cargoBuildFlags = [
+              "-p"
+              "native_core_ffi"
+            ];
 
-      sourceRoot = "${finalAttrs.src.name}/mobile";
-      packageRoot = "mobile";
-      patches = [
-        ./disable-release-lint.patch
-      ];
+            CARGO_BUILD_TARGET = rustTarget;
+            doCheck = false;
 
-      pubspecLock = lib.importJSON ./pubspec.lock.json;
-      gitHashes = lib.importJSON ./git-hashes.json;
-
-      # nixpkgs sqlite3 builder only switches to the 3.5.0+ hook path, but 3.4.0
-      # already moved description.dart under lib/src/hook/compile/.
-      customSourceBuilders = {
-        sqlite3 =
-          { version, src, ... }:
-          stdenv.mkDerivation (finalAttrs: {
-            pname = "sqlite3";
-            inherit version src;
-            inherit (src) passthru;
-
-            setupHook = writeScript "${finalAttrs.pname}-setup-hook" ''
-              sqliteFixupHook() {
-                runtimeDependencies+=('${lib.getLib sqlite}')
-              }
-
-              preFixupHooks+=(sqliteFixupHook)
-            '';
+            env = {
+              ANDROID_HOME = androidSdkRoot;
+              ANDROID_SDK_ROOT = androidSdkRoot;
+              ANDROID_NDK_ROOT = "${androidSdkRoot}/ndk/29.0.14206865";
+              ANDROID_NDK_HOME = "${androidSdkRoot}/ndk/29.0.14206865";
+            };
 
             postPatch = ''
-              substituteInPlace lib/src/hook/compile/description.dart \
-                --replace-fail "return fromGitHub(LibraryType.sqlite3);" "return LookupSystem('sqlite3');"
+              # Nix supplies the toolchain; rustup is unavailable in the sandbox.
+              rm -f crates/native_core_ffi/rust-toolchain.toml
             '';
 
             installPhase = ''
               runHook preInstall
-              cp --recursive . "$out"
+              install -Dm755 target/${rustTarget}/release/libnative_core_ffi.so \
+                "$out/${abi}/libnative_core_ffi.so"
               runHook postInstall
             '';
-          });
-      };
+          };
 
-      sdkSourceBuilders = {
-        flutter = mkFlutterSdkSourceBuilder {
-          inherit runCommand;
-          flutter = flutter347;
+        nativeCoreFfiLibs = symlinkJoin {
+          name = "immich-native-core-ffi-libs";
+          paths = [
+            (mkNativeCoreFfiLib {
+              crossPkgs = aarch64AndroidPkgs;
+              rustTarget = "aarch64-linux-android";
+              abi = "arm64-v8a";
+            })
+            (mkNativeCoreFfiLib {
+              crossPkgs = armv7AndroidPkgs;
+              rustTarget = "armv7-linux-androideabi";
+              abi = "armeabi-v7a";
+            })
+            (mkNativeCoreFfiLib {
+              crossPkgs = x86_64AndroidPkgs;
+              rustTarget = "x86_64-linux-android";
+              abi = "x86_64";
+            })
+          ];
         };
-      };
+      in
+      {
+        pname = "immich";
+        version = "3.4.1";
 
-      passthru.srcPkg = stdenv.mkDerivation {
-        pname = "immich-src";
-        inherit (finalAttrs) version;
-        src = finalAttrs.baseSrc;
-      };
-      passthru.updateScript = writeShellScriptBin "update-immich" ''
-        set -euo pipefail
-        ${lib.getExe nix-update} --flake --src-only apk_immich.passthru.srcPkg
-        system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-        "$(nix build ".#legacyPackages.$system.apk_immich.mitmCache.updateScript" --no-link --print-out-paths)"
-      '';
+        baseSrc = fetchFromGitHub {
+          owner = "immich-app";
+          repo = "immich";
+          tag = "v${finalAttrs.version}";
+          fetchSubmodules = true;
+          hash = "sha256-0B4oEMhpp5coy4fXGTgirVeYA1d2YfYYQShkFE2AQK0=";
+        };
 
-      mitmCache = gradle.fetchDeps {
-        inherit (finalAttrs) pname;
-        attrPath = "apk_immich";
-        pkg = finalAttrs.finalPackage;
-        data = ./immich_deps.json;
-        silent = false;
-        useBwrap = false;
-      };
+        src = applyPatches {
+          src = finalAttrs.baseSrc;
+          # v3.2.0 moved the OpenAPI Dart client to gitignored generated/openapi.
+          nativeBuildInputs = [ openapi-generator-cli ];
+          postPatch = ''
+            (
+              cd open-api
+              bash ./bin/generate-dart-sdk.sh
+            )
+            test -f mobile/generated/openapi/pubspec.yaml
 
-      gradleUpdateTask = "--init-script ${./build-tools-pin.init.gradle} :app:assembleRelease extractReleaseAnnotations";
+            # Replace rustup-based native_core hook with a prebuilt-.so loader.
+            # Must live in the fixed src: package_config points path deps here.
+            # Bake the store path into the hook — Flutter/Gradle may scrub env vars.
+            install -Dm644 ${./native-core-prebuilt-hook.dart} native/native_core/hook/build.dart
+            substituteInPlace native/native_core/hook/build.dart \
+              --replace-fail '@NATIVE_CORE_FFI_PREBUILT@' '${nativeCoreFfiLibs}'
+            mkdir -p native/native_core/lib/src
+            install -Dm644 ${./native-core-bindings.g.dart} native/native_core/lib/src/bindings.g.dart
+          '';
+        };
 
-      gradleUpdateScript = ''
-        runHook preBuild
-        runHook preGradleUpdate
-        flutter build apk --release --no-pub --dart-define=cronetHttpNoPlay=true || true
-        chmod -R u+w "$TMPDIR" "$HOME" || true
-        runHook postGradleUpdate
-      '';
+        sourceRoot = "${finalAttrs.src.name}/mobile";
+        packageRoot = "mobile";
+        patches = [
+          ./disable-release-lint.patch
+        ];
 
-      dontDartBuild = true;
-      dontDartInstall = true;
+        pubspecLock = lib.importJSON ./pubspec.lock.json;
+        gitHashes = lib.importJSON ./git-hashes.json;
 
-      nativeBuildInputs = [
-        openapi-generator-cli
-        curl
-        gradle
-        git
-        jdk21_headless
-        python3
-        writableTmpDirAsHomeHook
-      ];
+        # nixpkgs sqlite3 builder only switches to the 3.5.0+ hook path, but 3.4.0
+        # already moved description.dart under lib/src/hook/compile/.
+        customSourceBuilders = {
+          sqlite3 =
+            { version, src, ... }:
+            stdenv.mkDerivation (finalAttrs: {
+              pname = "sqlite3";
+              inherit version src;
+              inherit (src) passthru;
 
-      env = {
-        JAVA_HOME = jdkHome;
-        ANDROID_HOME = androidSdkRoot;
-        ANDROID_SDK_ROOT = androidSdkRoot;
-        ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = aapt2Path;
-      };
+              setupHook = writeScript "${finalAttrs.pname}-setup-hook" ''
+                sqliteFixupHook() {
+                  runtimeDependencies+=('${lib.getLib sqlite}')
+                }
 
-      gradleFlags = [
-        "-xlintVitalRelease"
-        "--project-dir"
-        "android"
-      ]
-      ++ gradleCommonOpts;
+                preFixupHooks+=(sqliteFixupHook)
+              '';
 
-      postPatch = ''
-        . ${flutterApkHelpers}
-        setup_writable_flutter_sdk ${flutter347}
+              postPatch = ''
+                substituteInPlace lib/src/hook/compile/description.dart \
+                  --replace-fail "return fromGitHub(LibraryType.sqlite3);" "return LookupSystem('sqlite3');"
+              '';
 
-        # Upstream pins one exact Flutter SDK version. Read it out of the tree
-        # instead of hardcoding it here, so the pin does not have to be chased
-        # on every update, and build with the SDK we actually ship.
-        upstream_flutter_pin="$(awk '$1 == "flutter:" && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { print $2; exit }' pubspec.yaml)"
-        if [[ -z "$upstream_flutter_pin" ]]; then
-          echo "immich: no pinned Flutter version found in pubspec.yaml" >&2
-          exit 1
-        fi
-        substituteInPlace pubspec.yaml \
-          --replace-fail "flutter: $upstream_flutter_pin" "flutter: ${flutter347.version}"
+              installPhase = ''
+                runHook preInstall
+                cp --recursive . "$out"
+                runHook postInstall
+              '';
+            });
+        };
 
-        substituteInPlace android/app/build.gradle \
-          --replace-fail "//f configurations.all {" "configurations.all {" \
-          --replace-fail "//f     exclude group: 'com.google.android.gms'" "    exclude group: 'com.google.android.gms'" \
-          --replace-fail "//f }" "}" \
-          --replace-fail "signingConfig hasKeystore ? signingConfigs.release : signingConfigs.debug" "signingConfig signingConfigs.debug"
+        sdkSourceBuilders = {
+          flutter = mkFlutterSdkSourceBuilder {
+            inherit runCommand;
+            flutter = flutter347;
+          };
+        };
 
-        substituteInPlace android/gradle.properties \
-          --replace-fail "org.gradle.jvmargs=-Xmx4096M" "org.gradle.jvmargs=-Xmx8192M"
+        passthru = {
+          inherit nativeCargoDeps nativeCoreFfiLibs;
+          srcPkg = stdenv.mkDerivation {
+            pname = "immich-src";
+            inherit (finalAttrs) version;
+            src = finalAttrs.baseSrc;
+          };
+          updateDeps = [ "nativeCargoDeps.vendorStaging" ];
+          updateScript = writeShellScriptBin "update-immich" ''
+            set -euo pipefail
+            package_file="app/apks/immich/package.nix"
+            package_attr=".#apk_immich"
+            fake_hash="${lib.fakeHash}"
 
-        ${lib.concatStringsSep "\n" (
-          lib.mapAttrsToList
-            (arch: src: ''
-              mkdir -p android/app/src/main/jniLibs/${arch}
-              cp ${src} android/app/src/main/jniLibs/${arch}/libsqlite3.so
-            '')
-            {
-              "armeabi-v7a" = fetchurl {
-                url = "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.4.0/libsqlite3.arm.android.so";
-                sha256 = "14qvd76v5q1554yx5lsqp0fsphqb868i8wbiww1azvyxq7zqs6vc";
-              };
-              "arm64-v8a" = fetchurl {
-                url = "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.4.0/libsqlite3.arm64.android.so";
-                sha256 = "0yw8nam2gxk971d7wfnycf2jazsf6jbybr9shihzn6bi3npib5g9";
-              };
-              "x86_64" = fetchurl {
-                url = "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.4.0/libsqlite3.x64.android.so";
-                sha256 = "1kglmay82mrzxa4x4ch4j2k62yacymjd7pxf38g4f7z1qmmd98p5";
-              };
-              "x86" = fetchurl {
-                url = "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.4.0/libsqlite3.ia32.android.so";
-                sha256 = "0xrp5m3f0hsxjz2qaxvc5nlgkh34hrmla153mivb4vl9snd68wvd";
-              };
-            }
-        )}
+            . "${../_shared/update-script-helpers.sh}"
 
-        setup_pinned_gradlew ${gradle}/bin/gradle "-I ${./build-tools-pin.init.gradle} "
+            ${lib.getExe nix-update} --flake --src-only apk_immich.passthru.srcPkg
+            refresh_update_deps ${lib.concatStringsSep " " finalAttrs.passthru.updateDeps}
+            refresh_mitm_cache
+          '';
+        };
 
-        {
-          echo 'distributionBase=GRADLE_USER_HOME'
-          echo 'distributionPath=wrapper/dists'
-          echo "distributionUrl=file\://${gradleZip}"
-          echo 'networkTimeout=10000'
-          echo 'validateDistributionUrl=false'
-          echo 'zipStoreBase=GRADLE_USER_HOME'
-          echo 'zipStorePath=wrapper/dists'
-        } > android/gradle/wrapper/gradle-wrapper.properties
+        mitmCache = gradle.fetchDeps {
+          inherit (finalAttrs) pname;
+          attrPath = "apk_immich";
+          pkg = finalAttrs.finalPackage;
+          data = ./immich_deps.json;
+          silent = false;
+          useBwrap = false;
+        };
 
-      '';
+        gradleUpdateTask = "--init-script ${./build-tools-pin.init.gradle} :app:assembleRelease extractReleaseAnnotations";
 
-      preConfigure = ''
-        export PUB_CACHE="$PWD/.pub-cache"
+        gradleUpdateScript = ''
+          runHook preBuild
+          runHook preGradleUpdate
+          flutter build apk --release --no-pub --dart-define=cronetHttpNoPlay=true || true
+          chmod -R u+w "$TMPDIR" "$HOME" || true
+          runHook postGradleUpdate
+        '';
 
-        # Flutter includeBuild caches under ~/.cache/flutter/nix-flutter-tools-gradle
-        # with absolute symlinks into the build tree; keep HOME inside $TMPDIR so
-        # mitm-update / successive builds cannot reuse stale dangling links.
-        export HOME="$(mktemp -d)"
-        export ANDROID_USER_HOME="$HOME/.android"
-        mkdir -p "$ANDROID_USER_HOME"
+        dontDartBuild = true;
+        dontDartInstall = true;
 
-        echo "sdk.dir=${androidSdkRoot}" > android/local.properties
-        echo "cmake.dir=${androidSdkRoot}/cmake/3.31.6" >> android/local.properties
-        echo "flutter.sdk=$PWD/flutter-sdk" >> android/local.properties
-        echo "flutter.versionName=3.0.1" >> android/local.properties
-        echo "flutter.versionCode=3054" >> android/local.properties
+        nativeBuildInputs = [
+          openapi-generator-cli
+          curl
+          gradle
+          git
+          jdk21_headless
+          python3
+          writableTmpDirAsHomeHook
+        ];
 
-        # Opt out of AGP 9.0+ new DSL to prevent Flutter Gradle plugin errors
-        echo "android.newDsl=false" >> android/gradle.properties
-        echo "android.builtInKotlin=false" >> android/gradle.properties
-        echo "-dontwarn com.google.android.gms.**" >> android/app/proguard-rules.pro
-      '';
+        env = {
+          JAVA_HOME = jdkHome;
+          ANDROID_HOME = androidSdkRoot;
+          ANDROID_SDK_ROOT = androidSdkRoot;
+          ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = aapt2Path;
+        };
 
-      preBuild = ''
-        . ${flutterApkHelpers}
+        gradleFlags = [
+          "-xlintVitalRelease"
+          "--project-dir"
+          "android"
+        ]
+        ++ gradleCommonOpts;
 
-        GRADLE_OPTS="''${GRADLE_OPTS:-}"
-        for gradle_opt in ${lib.escapeShellArgs gradleCommonOpts}; do
-          GRADLE_OPTS="$GRADLE_OPTS $gradle_opt"
-        done
-        append_mitm_gradle_opts
-        export FLUTTER_ROOT="$PWD/flutter-sdk"
+        postPatch = ''
+          . ${flutterApkHelpers}
+          setup_writable_flutter_sdk ${flutter347}
 
-        if [[ -n "''${MITM_CACHE_HOST:-}" && -n "''${MITM_CACHE_PORT:-}" && -n "''${MITM_CACHE_CA:-}" ]]; then
-          for artifact_url in \
-            https://dl.google.com/dl/android/maven2/androidx/appcompat/appcompat/1.2.0/appcompat-1.2.0.aar \
-            https://dl.google.com/dl/android/maven2/androidx/appcompat/appcompat-resources/1.2.0/appcompat-resources-1.2.0.aar \
-            https://dl.google.com/dl/android/maven2/androidx/transition/transition/1.4.1/transition-1.4.1.aar \
-            https://dl.google.com/dl/android/maven2/androidx/room/room-ktx/2.5.0/room-ktx-2.5.0.aar \
-            https://dl.google.com/dl/android/maven2/androidx/room/room-runtime/2.5.0/room-runtime-2.5.0.aar \
-            https://dl.google.com/dl/android/maven2/androidx/sqlite/sqlite-framework/2.3.0/sqlite-framework-2.3.0.aar \
-            https://dl.google.com/dl/android/maven2/androidx/sqlite/sqlite/2.3.0/sqlite-2.3.0.aar \
-            https://dl.google.com/dl/android/maven2/androidx/profileinstaller/profileinstaller/1.3.1/profileinstaller-1.3.1.aar \
-            https://dl.google.com/dl/android/maven2/androidx/compose/remote/remote-creation-android/1.0.0-alpha14/remote-creation-android-1.0.0-alpha14.aar \
-            https://dl.google.com/dl/android/maven2/androidx/compose/remote/remote-creation/1.0.0-alpha14/remote-creation-1.0.0-alpha14.aar
-          do
-            ${curl}/bin/curl --silent --show-error --fail --location \
-              --proxy "http://$MITM_CACHE_HOST:$MITM_CACHE_PORT" \
-              --cacert "$MITM_CACHE_CA" \
-              --output /dev/null \
-              "$artifact_url"
+          # Upstream pins one exact Flutter SDK version. Read it out of the tree
+          # instead of hardcoding it here, so the pin does not have to be chased
+          # on every update, and build with the SDK we actually ship.
+          upstream_flutter_pin="$(awk '$1 == "flutter:" && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { print $2; exit }' pubspec.yaml)"
+          if [[ -z "$upstream_flutter_pin" ]]; then
+            echo "immich: no pinned Flutter version found in pubspec.yaml" >&2
+            exit 1
+          fi
+          substituteInPlace pubspec.yaml \
+            --replace-fail "flutter: $upstream_flutter_pin" "flutter: ${flutter347.version}"
+
+          substituteInPlace android/app/build.gradle \
+            --replace-fail "//f configurations.all {" "configurations.all {" \
+            --replace-fail "//f     exclude group: 'com.google.android.gms'" "    exclude group: 'com.google.android.gms'" \
+            --replace-fail "//f }" "}" \
+            --replace-fail "signingConfig hasKeystore ? signingConfigs.release : signingConfigs.debug" "signingConfig signingConfigs.debug"
+
+          substituteInPlace android/gradle.properties \
+            --replace-fail "org.gradle.jvmargs=-Xmx4096M" "org.gradle.jvmargs=-Xmx8192M"
+
+          ${lib.concatStringsSep "\n" (
+            lib.mapAttrsToList
+              (arch: src: ''
+                mkdir -p android/app/src/main/jniLibs/${arch}
+                cp ${src} android/app/src/main/jniLibs/${arch}/libsqlite3.so
+              '')
+              {
+                "armeabi-v7a" = fetchurl {
+                  url = "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.4.0/libsqlite3.arm.android.so";
+                  sha256 = "14qvd76v5q1554yx5lsqp0fsphqb868i8wbiww1azvyxq7zqs6vc";
+                };
+                "arm64-v8a" = fetchurl {
+                  url = "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.4.0/libsqlite3.arm64.android.so";
+                  sha256 = "0yw8nam2gxk971d7wfnycf2jazsf6jbybr9shihzn6bi3npib5g9";
+                };
+                "x86_64" = fetchurl {
+                  url = "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.4.0/libsqlite3.x64.android.so";
+                  sha256 = "1kglmay82mrzxa4x4ch4j2k62yacymjd7pxf38g4f7z1qmmd98p5";
+                };
+                "x86" = fetchurl {
+                  url = "https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.4.0/libsqlite3.ia32.android.so";
+                  sha256 = "0xrp5m3f0hsxjz2qaxvc5nlgkh34hrmla153mivb4vl9snd68wvd";
+                };
+              }
+          )}
+
+          setup_pinned_gradlew ${gradle}/bin/gradle "-I ${./build-tools-pin.init.gradle} "
+
+          {
+            echo 'distributionBase=GRADLE_USER_HOME'
+            echo 'distributionPath=wrapper/dists'
+            echo "distributionUrl=file\://${gradleZip}"
+            echo 'networkTimeout=10000'
+            echo 'validateDistributionUrl=false'
+            echo 'zipStoreBase=GRADLE_USER_HOME'
+            echo 'zipStorePath=wrapper/dists'
+          } > android/gradle/wrapper/gradle-wrapper.properties
+
+          # Also ship in jniLibs for System.loadLibrary("native_core_ffi").
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            mkdir -p "android/app/src/main/jniLibs/$abi"
+            cp -L "${nativeCoreFfiLibs}/$abi/libnative_core_ffi.so" \
+              "android/app/src/main/jniLibs/$abi/libnative_core_ffi.so"
           done
-        fi
 
-        # Dart's HTTP client does not reliably honor SSL_CERT_FILE with the
-        # mitm-cache proxy; clear proxy env so codegen can use system CAs.
-        # Restore afterwards so Flutter/Gradle artifact fetches stay on mitm.
-        if [[ -n "''${MITM_CACHE_CA:-}" ]]; then
-          _immich_http_proxy="''${http_proxy-}"
-          _immich_https_proxy="''${https_proxy-}"
-          _immich_SSL_CERT_FILE="''${SSL_CERT_FILE-}"
-          _immich_NIX_SSL_CERT_FILE="''${NIX_SSL_CERT_FILE-}"
-          unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy
-          unset SSL_CERT_FILE NIX_SSL_CERT_FILE
-        fi
+        '';
 
-        # dartConfigHook leaves package_config.json read-only; later remaps need write.
-        chmod u+w .dart_tool/package_config.json
+        preConfigure = ''
+          export PUB_CACHE="$PWD/.pub-cache"
 
-        packageRun easy_localization -e generate -S ../i18n
-        dart --packages=.dart_tool/package_config.json bin/generate_keys.dart
-        dart format lib/generated/codegen_loader.g.dart lib/generated/translations.g.dart
+          # Flutter includeBuild caches under ~/.cache/flutter/nix-flutter-tools-gradle
+          # with absolute symlinks into the build tree; keep HOME inside $TMPDIR so
+          # mitm-update / successive builds cannot reuse stale dangling links.
+          export HOME="$(mktemp -d)"
+          export ANDROID_USER_HOME="$HOME/.android"
+          mkdir -p "$ANDROID_USER_HOME"
 
-        # Use packageRun (not `dart run`) so pub does not try to rewrite package_config
-        # or hit the network under the mitm proxy / nix sandbox.
-        # v3.2.0 no longer commits Drift/build_runner outputs; CI runs mise codegen.
-        packageRun drift_dev make-migrations
-        packageRun build_runner build --delete-conflicting-outputs
-        if [ -d pigeon ]; then
-          for pigeon_input in pigeon/*.dart; do
-            packageRun pigeon --input "$pigeon_input"
+          echo "sdk.dir=${androidSdkRoot}" > android/local.properties
+          echo "cmake.dir=${androidSdkRoot}/cmake/3.31.6" >> android/local.properties
+          echo "flutter.sdk=$PWD/flutter-sdk" >> android/local.properties
+          echo "flutter.versionName=3.0.1" >> android/local.properties
+          echo "flutter.versionCode=3054" >> android/local.properties
+
+          # Opt out of AGP 9.0+ new DSL to prevent Flutter Gradle plugin errors
+          echo "android.newDsl=false" >> android/gradle.properties
+          echo "android.builtInKotlin=false" >> android/gradle.properties
+          echo "-dontwarn com.google.android.gms.**" >> android/app/proguard-rules.pro
+        '';
+
+        preBuild = ''
+          . ${flutterApkHelpers}
+
+          GRADLE_OPTS="''${GRADLE_OPTS:-}"
+          for gradle_opt in ${lib.escapeShellArgs gradleCommonOpts}; do
+            GRADLE_OPTS="$GRADLE_OPTS $gradle_opt"
           done
-          dart format lib/platform/ || true
-        fi
+          append_mitm_gradle_opts
+          export FLUTTER_ROOT="$PWD/flutter-sdk"
 
-        if [[ -n "''${MITM_CACHE_CA:-}" ]]; then
-          [[ -n "''${_immich_http_proxy}" ]] && export http_proxy="''${_immich_http_proxy}" HTTP_PROXY="''${_immich_http_proxy}"
-          [[ -n "''${_immich_https_proxy}" ]] && export https_proxy="''${_immich_https_proxy}" HTTPS_PROXY="''${_immich_https_proxy}"
-          [[ -n "''${_immich_SSL_CERT_FILE}" ]] && export SSL_CERT_FILE="''${_immich_SSL_CERT_FILE}"
-          [[ -n "''${_immich_NIX_SSL_CERT_FILE}" ]] && export NIX_SSL_CERT_FILE="''${_immich_NIX_SSL_CERT_FILE}"
-        fi
-
-        mkdir -p .dart-patched
-        declare -A patched_pkg_dirs
-
-        ${python3}/bin/python3 - <<'PY' > dart_package_dirs.sh
-        import json
-        import shlex
-        import urllib.parse
-
-        with open(".dart_tool/package_config.json") as f:
-            data = json.load(f)
-
-        wanted = {
-            "geolocator_android": "GEOLOCATOR_ANDROID_DIR",
-            "native_video_player": "NATIVE_VIDEO_PLAYER_DIR",
-            "home_widget": "HOME_WIDGET_DIR",
-            "maplibre_gl": "MAPLIBRE_GL_DIR",
-        }
-
-        found = {env_name: "" for env_name in wanted.values()}
-        for pkg in data["packages"]:
-            env_name = wanted.get(pkg["name"])
-            if env_name:
-                found[env_name] = urllib.parse.urlparse(pkg["rootUri"]).path.removesuffix("/.")
-
-        for env_name, path in found.items():
-            print(f"export {env_name}={shlex.quote(path)}")
-        PY
-        . ./dart_package_dirs.sh
-
-        if [ -n "$GEOLOCATOR_ANDROID_DIR" ]; then
-          patched_geolocator_android_dir="$(clone_dart_package "$GEOLOCATOR_ANDROID_DIR" geolocator_android)"
-
-          substituteInPlace "$patched_geolocator_android_dir/android/build.gradle" \
-            --replace-fail "    implementation 'com.google.android.gms:play-services-location:21.2.0'" ""
-
-          rm "$patched_geolocator_android_dir/android/src/main/java/com/baseflow/geolocator/location/FusedLocationClient.java"
-          patch \
-            -d "$patched_geolocator_android_dir/android/src/main/java/com/baseflow/geolocator/location" \
-            -p1 < ${./geolocator-force-locationmanager.patch}
-
-          remap_dart_package_root "$GEOLOCATOR_ANDROID_DIR" "$patched_geolocator_android_dir"
-          patched_pkg_dirs["$GEOLOCATOR_ANDROID_DIR"]="$patched_geolocator_android_dir"
-        fi
-
-        flutter_engine_version="$(cat flutter-sdk/bin/internal/engine.version)"
-        if [ -n "$NATIVE_VIDEO_PLAYER_DIR" ] || [ -n "$HOME_WIDGET_DIR" ]; then
-          if [ -n "$NATIVE_VIDEO_PLAYER_DIR" ]; then
-            patched_native_video_player_dir="$(clone_dart_package "$NATIVE_VIDEO_PLAYER_DIR" native_video_player)"
-            substituteInPlace "$patched_native_video_player_dir/android/build.gradle" \
-              --replace-warn '     implementation("androidx.media3:media3-ui:1.9.2")' \
-                "     implementation(\"androidx.media3:media3-ui:1.9.2\")
-         implementation \"androidx.annotation:annotation:1.8.0\"
-         compileOnly \"io.flutter:flutter_embedding_release:1.0.0-$flutter_engine_version\""
-            remap_dart_package_root "$NATIVE_VIDEO_PLAYER_DIR" "$patched_native_video_player_dir"
-            patched_pkg_dirs["$NATIVE_VIDEO_PLAYER_DIR"]="$patched_native_video_player_dir"
-            NATIVE_VIDEO_PLAYER_DIR="$patched_native_video_player_dir"
+          if [[ -n "''${MITM_CACHE_HOST:-}" && -n "''${MITM_CACHE_PORT:-}" && -n "''${MITM_CACHE_CA:-}" ]]; then
+            for artifact_url in \
+              https://dl.google.com/dl/android/maven2/androidx/appcompat/appcompat/1.2.0/appcompat-1.2.0.aar \
+              https://dl.google.com/dl/android/maven2/androidx/appcompat/appcompat-resources/1.2.0/appcompat-resources-1.2.0.aar \
+              https://dl.google.com/dl/android/maven2/androidx/transition/transition/1.4.1/transition-1.4.1.aar \
+              https://dl.google.com/dl/android/maven2/androidx/room/room-ktx/2.5.0/room-ktx-2.5.0.aar \
+              https://dl.google.com/dl/android/maven2/androidx/room/room-runtime/2.5.0/room-runtime-2.5.0.aar \
+              https://dl.google.com/dl/android/maven2/androidx/sqlite/sqlite-framework/2.3.0/sqlite-framework-2.3.0.aar \
+              https://dl.google.com/dl/android/maven2/androidx/sqlite/sqlite/2.3.0/sqlite-2.3.0.aar \
+              https://dl.google.com/dl/android/maven2/androidx/profileinstaller/profileinstaller/1.3.1/profileinstaller-1.3.1.aar \
+              https://dl.google.com/dl/android/maven2/androidx/compose/remote/remote-creation-android/1.0.0-alpha14/remote-creation-android-1.0.0-alpha14.aar \
+              https://dl.google.com/dl/android/maven2/androidx/compose/remote/remote-creation/1.0.0-alpha14/remote-creation-1.0.0-alpha14.aar
+            do
+              ${curl}/bin/curl --silent --show-error --fail --location \
+                --proxy "http://$MITM_CACHE_HOST:$MITM_CACHE_PORT" \
+                --cacert "$MITM_CACHE_CA" \
+                --output /dev/null \
+                "$artifact_url"
+            done
           fi
 
-          if [ -n "$HOME_WIDGET_DIR" ]; then
-            patched_home_widget_dir="$(clone_dart_package "$HOME_WIDGET_DIR" home_widget)"
-            substituteInPlace "$patched_home_widget_dir/android/build.gradle" \
-              --replace-warn '    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.+"' \
-                "    implementation \"org.jetbrains.kotlinx:kotlinx-coroutines-android:1.+\"
-        compileOnly \"io.flutter:flutter_embedding_release:1.0.0-$flutter_engine_version\""
-            remap_dart_package_root "$HOME_WIDGET_DIR" "$patched_home_widget_dir"
-            patched_pkg_dirs["$HOME_WIDGET_DIR"]="$patched_home_widget_dir"
-            HOME_WIDGET_DIR="$patched_home_widget_dir"
+          # Dart's HTTP client does not reliably honor SSL_CERT_FILE with the
+          # mitm-cache proxy; clear proxy env so codegen can use system CAs.
+          # Restore afterwards so Flutter/Gradle artifact fetches stay on mitm.
+          if [[ -n "''${MITM_CACHE_CA:-}" ]]; then
+            _immich_http_proxy="''${http_proxy-}"
+            _immich_https_proxy="''${https_proxy-}"
+            _immich_SSL_CERT_FILE="''${SSL_CERT_FILE-}"
+            _immich_NIX_SSL_CERT_FILE="''${NIX_SSL_CERT_FILE-}"
+            unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy
+            unset SSL_CERT_FILE NIX_SSL_CERT_FILE
           fi
 
-          if [ -n "$MAPLIBRE_GL_DIR" ]; then
-            patched_maplibre_gl_dir="$(clone_dart_package "$MAPLIBRE_GL_DIR" maplibre_gl)"
-            remap_dart_package_root "$MAPLIBRE_GL_DIR" "$patched_maplibre_gl_dir"
-            patched_pkg_dirs["$MAPLIBRE_GL_DIR"]="$patched_maplibre_gl_dir"
-            MAPLIBRE_GL_DIR="$patched_maplibre_gl_dir"
+          # dartConfigHook leaves package_config.json read-only; later remaps need write.
+          chmod u+w .dart_tool/package_config.json
+
+          # buildDartApplication pins languageVersion to the SDK (3.13+). Dart 3.13
+          # rejects `final` on ordinary parameters (primary constructors), which
+          # freezed 3.x and Immich sources still emit. Keep the pubspec floor (3.12).
+          ${python3}/bin/python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path(".dart_tool/package_config.json")
+          data = json.loads(path.read_text())
+          for pkg in data.get("packages", []):
+              if pkg.get("name") == "immich_mobile":
+                  pkg["languageVersion"] = "3.12"
+          path.write_text(json.dumps(data, indent=2) + "\n")
+          PY
+
+          packageRun easy_localization -e generate -S ../i18n
+          dart --packages=.dart_tool/package_config.json bin/generate_keys.dart
+          dart format lib/generated/codegen_loader.g.dart lib/generated/translations.g.dart
+
+          # Use packageRun (not `dart run`) so pub does not try to rewrite package_config
+          # or hit the network under the mitm proxy / nix sandbox.
+          # v3.2.0 no longer commits Drift/build_runner outputs; CI runs mise codegen.
+          packageRun drift_dev make-migrations
+          packageRun build_runner build --delete-conflicting-outputs
+          if [ -d pigeon ]; then
+            for pigeon_input in pigeon/*.dart; do
+              packageRun pigeon --input "$pigeon_input"
+            done
+            dart format lib/platform/ || true
           fi
 
-          : > android/local-plugin-settings.gradle
-          if [ -n "$NATIVE_VIDEO_PLAYER_DIR" ]; then
-            printf '%s\n' \
-              'include(":native_video_player")' \
-              "project(\":native_video_player\").projectDir = new File(\"$NATIVE_VIDEO_PLAYER_DIR/android\")" \
-              >> android/local-plugin-settings.gradle
-          fi
-          if [ -n "$HOME_WIDGET_DIR" ]; then
-            printf '%s\n' \
-              'include(":home_widget")' \
-              "project(\":home_widget\").projectDir = new File(\"$HOME_WIDGET_DIR/android\")" \
-              >> android/local-plugin-settings.gradle
-          fi
-          if [ -n "$MAPLIBRE_GL_DIR" ]; then
-            printf '%s\n' \
-              'include(":maplibre_gl")' \
-              "project(\":maplibre_gl\").projectDir = new File(\"$MAPLIBRE_GL_DIR/android\")" \
-              >> android/local-plugin-settings.gradle
+          if [[ -n "''${MITM_CACHE_CA:-}" ]]; then
+            [[ -n "''${_immich_http_proxy}" ]] && export http_proxy="''${_immich_http_proxy}" HTTP_PROXY="''${_immich_http_proxy}"
+            [[ -n "''${_immich_https_proxy}" ]] && export https_proxy="''${_immich_https_proxy}" HTTPS_PROXY="''${_immich_https_proxy}"
+            [[ -n "''${_immich_SSL_CERT_FILE}" ]] && export SSL_CERT_FILE="''${_immich_SSL_CERT_FILE}"
+            [[ -n "''${_immich_NIX_SSL_CERT_FILE}" ]] && export NIX_SSL_CERT_FILE="''${_immich_NIX_SSL_CERT_FILE}"
           fi
 
-          if ! grep -Fq 'apply from: "local-plugin-settings.gradle"' android/settings.gradle; then
-            printf '\napply from: "local-plugin-settings.gradle"\n' >> android/settings.gradle
+          mkdir -p .dart-patched
+          declare -A patched_pkg_dirs
+
+          ${python3}/bin/python3 - <<'PY' > dart_package_dirs.sh
+          import json
+          import shlex
+          import urllib.parse
+
+          with open(".dart_tool/package_config.json") as f:
+              data = json.load(f)
+
+          wanted = {
+              "geolocator_android": "GEOLOCATOR_ANDROID_DIR",
+              "native_video_player": "NATIVE_VIDEO_PLAYER_DIR",
+              "home_widget": "HOME_WIDGET_DIR",
+              "maplibre_gl": "MAPLIBRE_GL_DIR",
+          }
+
+          found = {env_name: "" for env_name in wanted.values()}
+          for pkg in data["packages"]:
+              env_name = wanted.get(pkg["name"])
+              if env_name:
+                  found[env_name] = urllib.parse.urlparse(pkg["rootUri"]).path.removesuffix("/.")
+
+          for env_name, path in found.items():
+              print(f"export {env_name}={shlex.quote(path)}")
+          PY
+          . ./dart_package_dirs.sh
+
+          if [ -n "$GEOLOCATOR_ANDROID_DIR" ]; then
+            patched_geolocator_android_dir="$(clone_dart_package "$GEOLOCATOR_ANDROID_DIR" geolocator_android)"
+
+            substituteInPlace "$patched_geolocator_android_dir/android/build.gradle" \
+              --replace-fail "    implementation 'com.google.android.gms:play-services-location:21.2.0'" ""
+
+            rm "$patched_geolocator_android_dir/android/src/main/java/com/baseflow/geolocator/location/FusedLocationClient.java"
+            patch \
+              -d "$patched_geolocator_android_dir/android/src/main/java/com/baseflow/geolocator/location" \
+              -p1 < ${./geolocator-force-locationmanager.patch}
+
+            remap_dart_package_root "$GEOLOCATOR_ANDROID_DIR" "$patched_geolocator_android_dir"
+            patched_pkg_dirs["$GEOLOCATOR_ANDROID_DIR"]="$patched_geolocator_android_dir"
           fi
 
-          if ! grep -Fq "implementation project(':native_video_player')" android/app/build.gradle; then
-            substituteInPlace android/app/build.gradle \
-              --replace-fail '  implementation libs.kotlinx.serialization.json' \
-                $'  implementation libs.kotlinx.serialization.json\n  implementation project(\x27:native_video_player\x27)\n  implementation project(\x27:home_widget\x27)\n  implementation project(\x27:maplibre_gl\x27)'
+          flutter_engine_version="$(cat flutter-sdk/bin/internal/engine.version)"
+          if [ -n "$NATIVE_VIDEO_PLAYER_DIR" ] || [ -n "$HOME_WIDGET_DIR" ]; then
+            if [ -n "$NATIVE_VIDEO_PLAYER_DIR" ]; then
+              patched_native_video_player_dir="$(clone_dart_package "$NATIVE_VIDEO_PLAYER_DIR" native_video_player)"
+              substituteInPlace "$patched_native_video_player_dir/android/build.gradle" \
+                --replace-warn '     implementation("androidx.media3:media3-ui:1.9.2")' \
+                  "     implementation(\"androidx.media3:media3-ui:1.9.2\")
+           implementation \"androidx.annotation:annotation:1.8.0\"
+           compileOnly \"io.flutter:flutter_embedding_release:1.0.0-$flutter_engine_version\""
+              remap_dart_package_root "$NATIVE_VIDEO_PLAYER_DIR" "$patched_native_video_player_dir"
+              patched_pkg_dirs["$NATIVE_VIDEO_PLAYER_DIR"]="$patched_native_video_player_dir"
+              NATIVE_VIDEO_PLAYER_DIR="$patched_native_video_player_dir"
+            fi
+
+            if [ -n "$HOME_WIDGET_DIR" ]; then
+              patched_home_widget_dir="$(clone_dart_package "$HOME_WIDGET_DIR" home_widget)"
+              substituteInPlace "$patched_home_widget_dir/android/build.gradle" \
+                --replace-warn '    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.+"' \
+                  "    implementation \"org.jetbrains.kotlinx:kotlinx-coroutines-android:1.+\"
+          compileOnly \"io.flutter:flutter_embedding_release:1.0.0-$flutter_engine_version\""
+              remap_dart_package_root "$HOME_WIDGET_DIR" "$patched_home_widget_dir"
+              patched_pkg_dirs["$HOME_WIDGET_DIR"]="$patched_home_widget_dir"
+              HOME_WIDGET_DIR="$patched_home_widget_dir"
+            fi
+
+            if [ -n "$MAPLIBRE_GL_DIR" ]; then
+              patched_maplibre_gl_dir="$(clone_dart_package "$MAPLIBRE_GL_DIR" maplibre_gl)"
+              remap_dart_package_root "$MAPLIBRE_GL_DIR" "$patched_maplibre_gl_dir"
+              patched_pkg_dirs["$MAPLIBRE_GL_DIR"]="$patched_maplibre_gl_dir"
+              MAPLIBRE_GL_DIR="$patched_maplibre_gl_dir"
+            fi
+
+            : > android/local-plugin-settings.gradle
+            if [ -n "$NATIVE_VIDEO_PLAYER_DIR" ]; then
+              printf '%s\n' \
+                'include(":native_video_player")' \
+                "project(\":native_video_player\").projectDir = new File(\"$NATIVE_VIDEO_PLAYER_DIR/android\")" \
+                >> android/local-plugin-settings.gradle
+            fi
+            if [ -n "$HOME_WIDGET_DIR" ]; then
+              printf '%s\n' \
+                'include(":home_widget")' \
+                "project(\":home_widget\").projectDir = new File(\"$HOME_WIDGET_DIR/android\")" \
+                >> android/local-plugin-settings.gradle
+            fi
+            if [ -n "$MAPLIBRE_GL_DIR" ]; then
+              printf '%s\n' \
+                'include(":maplibre_gl")' \
+                "project(\":maplibre_gl\").projectDir = new File(\"$MAPLIBRE_GL_DIR/android\")" \
+                >> android/local-plugin-settings.gradle
+            fi
+
+            if ! grep -Fq 'apply from: "local-plugin-settings.gradle"' android/settings.gradle; then
+              printf '\napply from: "local-plugin-settings.gradle"\n' >> android/settings.gradle
+            fi
+
+            if ! grep -Fq "implementation project(':native_video_player')" android/app/build.gradle; then
+              substituteInPlace android/app/build.gradle \
+                --replace-fail '  implementation libs.kotlinx.serialization.json' \
+                  $'  implementation libs.kotlinx.serialization.json\n  implementation project(\x27:native_video_player\x27)\n  implementation project(\x27:home_widget\x27)\n  implementation project(\x27:maplibre_gl\x27)'
+            fi
           fi
-        fi
 
-        while IFS= read -r pkg_dir; do
-          [ -d "$pkg_dir/android" ] || continue
-          ensure_writable_dart_package "$pkg_dir" >/dev/null
-        done < <(${python3}/bin/python3 - <<'PY'
-        import json
-        import urllib.parse
+          while IFS= read -r pkg_dir; do
+            [ -d "$pkg_dir/android" ] || continue
+            ensure_writable_dart_package "$pkg_dir" >/dev/null
+          done < <(${python3}/bin/python3 - <<'PY'
+          import json
+          import urllib.parse
 
-        with open(".dart_tool/package_config.json") as f:
-            data = json.load(f)
+          with open(".dart_tool/package_config.json") as f:
+              data = json.load(f)
 
-        seen = set()
-        for pkg in data["packages"]:
-            uri = pkg.get("rootUri", "")
-            if not uri.startswith("file://"):
-                continue
-            path = urllib.parse.urlparse(uri).path.removesuffix("/.")
-            if path and path not in seen:
-                seen.add(path)
-                print(path)
-        PY
-        )
+          seen = set()
+          for pkg in data["packages"]:
+              uri = pkg.get("rootUri", "")
+              if not uri.startswith("file://"):
+                  continue
+              path = urllib.parse.urlparse(uri).path.removesuffix("/.")
+              if path and path not in seen:
+                  seen.add(path)
+                  print(path)
+          PY
+          )
 
-        ${pythonWithYaml}/bin/python3 ${../_shared/generate-flutter-plugins.py}
-      '';
+          ${pythonWithYaml}/bin/python3 ${../_shared/generate-flutter-plugins.py}
+        '';
 
-      buildPhase = ''
-        runHook preBuild
-        flutter build apk --release --no-pub --dart-define=cronetHttpNoPlay=true
-        runHook postBuild
-      '';
+        buildPhase = ''
+          runHook preBuild
+          flutter build apk --release --no-pub --dart-define=cronetHttpNoPlay=true
+          runHook postBuild
+        '';
 
-      installPhase = ''
-        runHook preInstall
+        installPhase = ''
+          runHook preInstall
 
-        apk_path="$(echo build/app/outputs/flutter-apk/*.apk | awk '{print $1}')"
-        install -Dm644 "$apk_path" "$out/immich.apk"
+          apk_path="$(echo build/app/outputs/flutter-apk/*.apk | awk '{print $1}')"
+          install -Dm644 "$apk_path" "$out/immich.apk"
 
-        runHook postInstall
-      '';
+          runHook postInstall
+        '';
 
-      meta = with lib; {
-        sourceProvenance = with sourceTypes; [ fromSource ];
-        description = "Immich mobile app built from source";
-        homepage = "https://github.com/immich-app/immich";
-        license = licenses.agpl3Only;
-        platforms = platforms.unix;
-      };
-    });
+        meta = with lib; {
+          sourceProvenance = with sourceTypes; [ fromSource ];
+          description = "Immich mobile app built from source";
+          homepage = "https://github.com/immich-app/immich";
+          license = licenses.agpl3Only;
+          platforms = platforms.unix;
+        };
+      }
+    );
 in
 mk-apk-package {
   inherit appPackage;

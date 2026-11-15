@@ -25,17 +25,19 @@
   rustc,
   writableTmpDirAsHomeHook,
   gradle_8_14_4,
-  nix-update-script,
+  nix-update,
+  writeShellScriptBin,
 }:
 
 let
-  version = "13.1.1.0";
+  version = "13.2.3.0";
 
   src = fetchFromGitHub {
     owner = "forkgram";
     repo = "TelegramAndroid";
+    name = "forkgram-${version}-source";
     tag = version;
-    hash = "sha256-Kht+HIMdrkAYhcv+MXs7Tzi4tZNtHE2qyY0vclrfBOQ=";
+    hash = "sha256-7VED7WeegxWe2eRmPAXONofw3QFclA+qaX1kyD4chFQ=";
     fetchSubmodules = true;
   };
 
@@ -271,6 +273,7 @@ buildGradlePackage rec {
             substituteInPlace TMessagesProj/jni/prepare.py \
               --replace-fail "return 'rm -rf ' + folder" "return 'true'" \
               --replace-quiet "git submodule init && git submodule update" "" \
+              --replace-quiet "git submodule update --init --recursive" "" \
               --replace-quiet "git checkout -- prebuild" "" \
               --replace-quiet "./prebuild/build_all.sh" "bash -x ./prebuild/build_all.sh" \
               --replace-quiet "cd boringssl && git reset --hard HEAD && cd .." "" \
@@ -279,11 +282,13 @@ buildGradlePackage rec {
               --replace-quiet "git checkout -- ffmpeg" "" \
               --replace-quiet "git checkout -- prebuild" ""
 
-            substituteInPlace TMessagesProj/jni/prebuild/build_wamr.sh --replace-fail "-DWAMR_BUILD_LIB_WASI_THREADS=0" "-DWAMR_BUILD_LIB_WASI_THREADS=0 -DWAMR_BUILD_SIMD=0"
+            # prepare.py stages still shell out to git; an empty repo is enough.
+            git -C . init
+            git -C . config user.email 'nixbld@localhost'
+            git -C . config user.name 'nixbld'
+            git -C . commit --allow-empty -m 'nix source' --quiet
 
-            substituteInPlace TMessagesProj/jni/prebuild/build_prisma.sh \
-              --replace-fail 'actual_commit="$(git -C "$PRISMA_SRC" rev-parse HEAD)"' 'actual_commit="$EXPECTED_COMMIT"' \
-              --replace-fail 'actual_boost_commit="$(git -C "$BOOST_REGEX_SRC" rev-parse HEAD)"' 'actual_boost_commit="$EXPECTED_BOOST_COMMIT"'
+            substituteInPlace TMessagesProj/jni/prebuild/build_wamr.sh --replace-fail "-DWAMR_BUILD_LIB_WASI_THREADS=0" "-DWAMR_BUILD_LIB_WASI_THREADS=0 -DWAMR_BUILD_SIMD=0"
 
             install -Dm644 ${tlottieArm64}/arm64-v8a/libtlottie.a \
               TMessagesProj/jni/prebuild/safe_tlottie/arm64-v8a/libtlottie.a
@@ -402,12 +407,26 @@ buildGradlePackage rec {
   '';
 
   passthru = {
+    inherit tlottieCargoDeps walletCargoDeps;
+    updateDeps = [
+      "tlottieCargoDeps.vendorStaging"
+      "walletCargoDeps.vendorStaging"
+    ];
     signScript = mkSignScript {
       name = "sign-forkgram";
       apkPath = "${placeholder "out"}/forkgram.apk";
       defaultOut = "forkgram-signed.apk";
     };
-    updateScript = nix-update-script { };
+    updateScript = writeShellScriptBin "update-forkgram" ''
+      set -euo pipefail
+      package_file="app/apks/forkgram/package.nix"
+      package_attr=".#apk_forkgram"
+      fake_hash="${lib.fakeHash}"
+      . "${../_shared/update-script-helpers.sh}"
+      ${lib.getExe nix-update} --flake --src-only apk_forkgram
+      refresh_update_deps tlottieCargoDeps.vendorStaging walletCargoDeps.vendorStaging
+      refresh_gradle_lock ${gradle_8_14_4.version} app/apks/forkgram/gradle.lock
+    '';
   };
   meta = with lib; {
     description = "Telegram Android client fork (ForkGram)";

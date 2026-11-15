@@ -20,12 +20,19 @@ replace_literal() {
   local new="$2"
   local tmp
 
+  [[ "$old" == "$new" ]] && return 0
+  [[ -n "$old" ]] || { echo "error: cannot replace an empty string" >&2; return 1; }
+
   tmp="$(mktemp "${package_file}.XXXXXX")"
   awk -v old="$old" -v new="$new" '
     {
-      while ((i = index($0, old)) > 0)
-        $0 = substr($0, 1, i - 1) new substr($0, i + length(old))
-      print
+      rest = $0
+      result = ""
+      while ((i = index(rest, old)) > 0) {
+        result = result substr(rest, 1, i - 1) new
+        rest = substr(rest, i + length(old))
+      }
+      print result rest
     }
   ' "$package_file" >"$tmp"
   mv "$tmp" "$package_file"
@@ -89,3 +96,21 @@ refresh_mitm_cache() {
   update_script="$(nix build "$package_attr.mitmCache.updateScript" --no-link --print-out-paths)"
   "$update_script"
 }
+
+# Generate a gradle2nix v2 lock using the package's SDK and an exact Gradle
+# version. Keep the existing lock until generation has completed successfully.
+refresh_gradle_lock() (
+  local gradle_version="$1"
+  local lock_file="$2"
+  local tmp src
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  src="$(nix build "$package_attr.src" --no-link --print-out-paths)"
+  cp -R "$src/." "$tmp/"
+  chmod -R u+w "$tmp"
+  nix develop "$package_attr" -c bash -c '
+    cd "$1"
+    nix run github:tadfisher/gradle2nix/v2 -- --gradle-wrapper="$2"
+  ' bash "$tmp" "$gradle_version"
+  mv "$tmp/gradle.lock" "$lock_file"
+)

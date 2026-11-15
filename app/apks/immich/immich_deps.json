@@ -913,6 +913,10 @@
    "module": "sha256-KhCXm7s7zXslt/Zkq06bAW+r8hdKJnaLZ34S5L6kx8Q=",
    "pom": "sha256-Unq/pajWr3SLN+HAFi0WM6LV6kOHsCBai0NrYhS6HPY="
   },
+  "androidx/core#core/1.15.0": {
+   "module": "sha256-6KbDhuF2XYcAEv7SIhFz1KLo0v1a7HMsUa+0qfRoRRk=",
+   "pom": "sha256-4WiuVgZLjlpAvOQV75X/1agTq7VFbSd18P70Ju1J41o="
+  },
   "androidx/core#core/1.16.0": {
    "module": "sha256-SrSjsLwWZOOixg3saZr2NXeOFcbuNzlxaQlI8HPdch4=",
    "pom": "sha256-B0l0oVUCIa96qF3taQPD2Eyb3t+ea0/zsMtHEym1rHc="
@@ -969,6 +973,20 @@
   },
   "androidx/core/core/1.18.0/core-1.18.0": {
    "aar": "sha256-MR2DrGfTlAduwh0S7S0QpEtZyykpt9zgDlqQqThC430="
+  },
+  "androidx/credentials#credentials-play-services-auth/1.6.0": {
+   "module": "sha256-R/d38BLhm1OtBuxzgo4NXtQLunb9vF0fyjkf13bqoeY=",
+   "pom": "sha256-n3SPiZK6Xen51ilzoE+KtxdEuKxIbuhLiKfpi+m92RM="
+  },
+  "androidx/credentials#credentials/1.6.0": {
+   "module": "sha256-Y5rgvcHQmk0MPNGYhQ/YUwNjz2XFXHyHCxdZaIM0YWM=",
+   "pom": "sha256-MZPwJWaYmw5ZM043TZmC2PMKEvrpB9dxnvvE0AVPmwQ="
+  },
+  "androidx/credentials/credentials-play-services-auth/1.6.0/credentials-play-services-auth-1.6.0": {
+   "aar": "sha256-g3oKAZiPkxgrvj4BAHy8wqmskYXJNBU6E2s3rBvYzEg="
+  },
+  "androidx/credentials/credentials/1.6.0/credentials-1.6.0": {
+   "aar": "sha256-kFGSJZLuPJI3DOP5QtZmYfHpBQrFs3CTLHHwo4Cs8ic="
   },
   "androidx/cursoradapter#cursoradapter/1.0.0": {
    "pom": "sha256-YtlciYUK8hAwsZ8U1ffs1ti8yaMBTFkALsmWJMqsgQA="
@@ -1432,6 +1450,10 @@
   "androidx/lifecycle#lifecycle-livedata-core/2.6.1": {
    "module": "sha256-6cDcPwrFRBnAz+2P9c7LgpQ6fFj3pUFp8NhJssYKNVI=",
    "pom": "sha256-4PZ+Ky5hLxO8Dzzqck2u3vpdRJQFHrRfW+5tiKbaiFk="
+  },
+  "androidx/lifecycle#lifecycle-livedata-core/2.6.2": {
+   "module": "sha256-Un0OGsRn0fR8wg7Xww2xcCFymfq7hoFUz10XZeTk2tk=",
+   "pom": "sha256-H6+Ov1Pyiy8K4sIJU3GuZ9DKFqwyj85/FjYJpDIUtaQ="
   },
   "androidx/lifecycle#lifecycle-livedata-core/2.7.0": {
    "module": "sha256-igjtX5cXo1QSMRZDNgAKCMORH44Ya8ds1SayqCLWRk0=",
@@ -4806,6 +4828,12 @@
   "com/google/android/gms/play-services-tasks/18.4.1/play-services-tasks-18.4.1": {
    "aar": "sha256-6OOgEuUCCfgM4tmIrTsxkn0g/uFV0LZTiFm8DZA2c9I="
   },
+  "com/google/android/libraries/identity/googleid#googleid/1.1.0": {
+   "pom": "sha256-qEdbQ+Ya7cha2fZsRyeN1K7QyP9CaWEDW3LIuDlbGSE="
+  },
+  "com/google/android/libraries/identity/googleid/googleid/1.1.0/googleid-1.1.0": {
+   "aar": "sha256-GUrB/BmG3R9iBG+uN933fmN3D9wfPTS6qjl8+/TRkaI="
+  },
   "com/google/android/material#material/1.12.0": {
    "module": "sha256-nduhK1yARExFQT8EOzT9MSfCSTxQap2x7L/mMDnYPjQ=",
    "pom": "sha256-U2k7foGR6XB/HMDyeIIXpsTZ3g689UgVGvaf+n4SsdQ="
@@ -8055,10 +8083,6 @@
   "org/jetbrains/kotlinx#kotlinx-coroutines-core/1.5.0": {
    "module": "sha256-2KJqiW2jL7H4w/E/5By3mKYSocHd86VV2C7h/xbvE9M=",
    "pom": "sha256-/8k2P3ybw40mHJOM23+kXO5WiU1xq7Kd+/23CzVY1FI="
-  },
-  "org/jetbrains/kotlinx#kotlinx-coroutines-core/1.5.2": {
-   "module": "sha256-e59pYMZonRp52CyjsAuDR71X0V/kBwo9006CbnYTY5I=",
-   "pom": "sha256-9wPjHqf4URl1mWZF94WbNR6gNokDCMRWL0dI6Y8Mx+I="
   },
   "org/jetbrains/kotlinx#kotlinx-coroutines-core/1.7.1": {
    "module": "sha256-qcwMK+48b8S6jQ51Oj8+cOGB2l3zolie5U6SgHszrM8=",

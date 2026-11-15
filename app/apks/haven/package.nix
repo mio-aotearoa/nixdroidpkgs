@@ -12,6 +12,7 @@
   stdenv,
   stdenvNoCC,
   fetchFromGitHub,
+  fetchurl,
   writeShellScriptBin,
   nix-update,
   rustPlatform,
@@ -42,6 +43,12 @@ let
       androidSdkRoot = "${androidSdk}/share/android-sdk";
       androidNdkRoot = "${androidSdkRoot}/ndk/29.0.14206865";
       aapt2 = "${androidSdkRoot}/build-tools/37.0.0/aapt2";
+
+      # Pinned by build-proot/build.sh (CHROOTNG_COMMIT / CHROOTNG_TARBALL_SHA256).
+      fakeChrootNgTarball = fetchurl {
+        url = "https://github.com/sylirre/fake-chroot-ng/archive/869c42b705e889a487a9503e219fedfab71f4d88.tar.gz";
+        hash = "sha256-zyiRAM4r894juKH/Jzlj9NKzpa0g/0pxC9XDl0CLCAo=";
+      };
 
       gradle = gradle_9_7_1;
 
@@ -89,7 +96,7 @@ let
         pname = "haven-rdp-transport-jni-libs";
         inherit (finalAttrs0) version src;
         cargoRoot = "rdp-kotlin/rust";
-        hash = "sha256-AFpK/IuoWAYp0R5WnsOfQjZ5sbypW+rOFi9wVewGc+g=";
+        hash = "sha256-I7frosTX1HpxFzdWuBRtWt61b5dErG9EPYOFkR8DOdA=";
       };
 
       mkRdpTransportJniLib =
@@ -297,7 +304,7 @@ let
 
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
-        outputHash = "sha256-3fNVlYYmy9Z1XPAGJ6K8ui1Jhf73xmjVK6p9bNpLdU4=";
+        outputHash = "sha256-VYC02nXR8BWpgHPs+EJEDhLZUV4z+iLOgk7l3jw1iP0=";
         dontConfigure = true;
         dontFixup = true;
 
@@ -374,14 +381,14 @@ let
           cp -R ${rcloneGoModCache}/cache "$GOMODCACHE"
           chmod -R u+w "$GOMODCACHE"
 
-          if [ -f "$GOMODCACHE/tailscale.com@v1.104.2/go.mod" ]; then
-            substituteInPlace "$GOMODCACHE/tailscale.com@v1.104.2/go.mod" \
-              --replace-fail "go 1.27.3" "go 1.27.2"
-          fi
-          if [ -f "$GOMODCACHE/cache/download/tailscale.com/@v/v1.104.2.mod" ]; then
-            substituteInPlace "$GOMODCACHE/cache/download/tailscale.com/@v/v1.104.2.mod" \
-              --replace-fail "go 1.27.3" "go 1.27.2"
-          fi
+          # nixpkgs go_1_27 is currently 1.27.3; pin GOTOOLCHAIN=local and
+          # downgrade module go directives that demand a newer patch release.
+          for ts_mod in "$GOMODCACHE"/tailscale.com@v*/go.mod \
+            "$GOMODCACHE"/cache/download/tailscale.com/@v/*.mod; do
+            if [ -f "$ts_mod" ] && grep -q 'go 1.27.4' "$ts_mod"; then
+              substituteInPlace "$ts_mod" --replace-fail "go 1.27.4" "go 1.27.3"
+            fi
+          done
 
           export GOBIN="$TMPDIR/go-bin"
           mkdir -p "$GOBIN"
@@ -403,9 +410,14 @@ let
             chmod -R u+w ../core/tunnel/jniLibs-openvpn3
             cd go
 
-            substituteInPlace go.sum \
-              --replace-fail "tailscale.com v1.104.2/go.mod h1:D+gqEyJjFnwIaojBLaKxUbOfEO3cRXOaFaOZ5BIvYqs=" \
-                             "tailscale.com v1.104.2/go.mod h1:zM/DEBP/ZMXOlPtP3M2lL3P8xQ/2FTl5MB3TSxMbouo="
+            # prepareXMobile already rewrites this module's `go` directive.
+            # After downgrading Tailscale's go.mod in the module cache, refresh
+            # the matching go.sum hashes so offline module auth still passes.
+            if grep -q 'tailscale.com v1.104.7/go.mod h1:pNl682NgUoac2/Um3khv8pduX3D1YPBZTL067+zo8wY=' go.sum; then
+              substituteInPlace go.sum \
+                --replace-fail "tailscale.com v1.104.7/go.mod h1:pNl682NgUoac2/Um3khv8pduX3D1YPBZTL067+zo8wY=" \
+                               "tailscale.com v1.104.7/go.mod h1:RROMXOJKiSHdVBeNtruULbCtqamzizsDgqQRYlCHclM="
+            fi
 
             (cd ../x-mobile/cmd/gobind && go build -o "$GOBIN/gobind")
             (cd ../x-mobile/cmd/gomobile && go build -o "$GOBIN/gomobile")
@@ -525,7 +537,7 @@ let
     in
     {
       pname = "haven";
-      version = "5.94.32";
+      version = "5.94.50";
 
       __darwinAllowLocalNetworking = true;
       __noChroot = stdenv.hostPlatform.isDarwin;
@@ -533,9 +545,10 @@ let
       src = fetchFromGitHub {
         owner = "GlassHaven";
         repo = "Haven";
+        name = "haven-${finalAttrs0.version}-source";
         tag = "v${finalAttrs0.version}";
         fetchSubmodules = true;
-        hash = "sha256-Jg/RlTbffXgINPdDplvgyHgUeUkp0v57HzzaZQjypqI=";
+        hash = "sha256-mg4cAAxwqxVVVg0V/9Q833nRbSt18KakFvL8Pc5gUao=";
       };
 
       patches = [
@@ -629,6 +642,11 @@ let
         export ANDROID_USER_HOME="$HOME/.android"
         mkdir -p "$ANDROID_USER_HOME"
         echo "sdk.dir=${androidSdkRoot}" > local.properties
+
+        # Offline fake-chroot-ng for build-proot/build.sh (no network in build).
+        mkdir -p build-proot/dl
+        cp ${fakeChrootNgTarball} \
+          build-proot/dl/fake-chroot-ng-869c42b705e889a487a9503e219fedfab71f4d88.tar.gz
 
         mkdir -p rdp-kotlin/jniLibs
         cp -r ${rdpTransportJniLibs}/. rdp-kotlin/jniLibs/

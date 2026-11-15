@@ -27,7 +27,7 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "kdeconnect-android";
-      version = "1.37.2";
+      version = "1.37.3";
 
       __darwinAllowLocalNetworking = true;
       __noChroot = stdenv.hostPlatform.isDarwin;
@@ -35,8 +35,9 @@ let
       src = fetchFromGitHub {
         owner = "KDE";
         repo = "kdeconnect-android";
+        name = "kdeconnect-android-${finalAttrs.version}-source";
         tag = "v${finalAttrs.version}";
-        hash = "sha256-qbVu8OprZTfd/eGrn4zJCVz/yr3kNrBZF/Zoylw/Pgw=";
+        hash = "sha256-htLiNxiy2AMxrVRqQas/Cymadv5Cnv2pUMx8NJcZlaQ=";
       };
 
       gradleBuildTask = "assembleRelease";
@@ -89,7 +90,7 @@ let
       '';
 
       passthru = {
-        updateScript = nix-update-script { };
+        updateScript = nix-update-script { extraArgs = [ "--flake" ]; };
       };
 
       meta = with lib; {

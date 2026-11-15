@@ -1,7 +1,6 @@
-diff -ruN a/TMessagesProj/build.gradle b/TMessagesProj/build.gradle
---- a/TMessagesProj/build.gradle	2026-10-15 21:36:03.235672125 +1100
-+++ b/TMessagesProj/build.gradle	2026-10-15 21:36:29.399713785 +1100
-@@ -73,12 +73,9 @@
+--- a/TMessagesProj/build.gradle
++++ b/TMessagesProj/build.gradle
+@@ -74,14 +74,11 @@
      implementation 'com.stripe:stripe-android:2.0.2'
      implementation 'com.google.code.gson:gson:2.11.0'
      implementation 'com.google.guava:guava:31.1-android'
@@ -9,12 +8,14 @@ diff -ruN a/TMessagesProj/build.gradle b/TMessagesProj/build.gradle
 -    implementation 'com.google.android.gms:play-services-safetynet:18.0.1'
  
      implementation 'co.nstant.in:cbor:0.8'
+ 
+     // Pinned: passkeys were built on 1.6.0-alpha04.
      implementation "androidx.credentials:credentials:1.6.0-alpha04"
 -    implementation "androidx.credentials:credentials-play-services-auth:1.6.0-alpha04"
  
      implementation "io.noties.markwon:core:4.6.2"
      implementation "io.noties.markwon:ext-strikethrough:4.6.2"
-@@ -136,14 +133,14 @@
+@@ -140,14 +137,14 @@
      }
  
      compileOptions {
@@ -32,9 +33,8 @@ diff -ruN a/TMessagesProj/build.gradle b/TMessagesProj/build.gradle
      }
  
      defaultConfig.versionCode = Integer.parseInt(Utils['getVersionCode']())
-diff -ruN a/TMessagesProj_App/build.gradle b/TMessagesProj_App/build.gradle
---- a/TMessagesProj_App/build.gradle	2026-10-15 21:36:03.238672130 +1100
-+++ b/TMessagesProj_App/build.gradle	2026-10-15 21:36:29.399713785 +1100
+--- a/TMessagesProj_App/build.gradle
++++ b/TMessagesProj_App/build.gradle
 @@ -61,8 +61,8 @@
      }
  

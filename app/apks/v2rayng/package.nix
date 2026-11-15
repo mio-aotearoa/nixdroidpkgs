@@ -26,6 +26,7 @@ let
         s.platforms-android-36
         s.platforms-android-37-0
         s.build-tools-36-0-0
+        s.build-tools-37-0-0
         s.ndk-28-2-13676358
       ]);
 
@@ -245,7 +246,7 @@ let
 
       env =
         let
-          aapt2Path = "${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2";
+          aapt2Path = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
         in
         {
           JAVA_HOME = jdk25_headless;
@@ -263,7 +264,7 @@ let
       '';
 
       postPatch = agp-resolution.patchSettingsGradle {
-        agpVersion = "9.4.1";
+        agpVersion = "9.5.1";
         extraPlugins = [
           {
             ids = [ "org.jetbrains.kotlin.android" ];
@@ -275,7 +276,7 @@ let
 
       gradleFlags =
         let
-          aapt2Path = "${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2";
+          aapt2Path = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
         in
         [
           "-Dorg.gradle.java.installations.auto-download=false"

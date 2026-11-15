@@ -24,13 +24,14 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "mastodon-android";
-      version = "2.13.5";
+      version = "2.13.7";
 
       src = fetchFromGitHub {
         owner = "mastodon";
         repo = "mastodon-android";
+        name = "mastodon-android-${finalAttrs.version}-source";
         tag = "v${finalAttrs.version}";
-        hash = "sha256-I+UHfniTArztJrLHaWfUwjjuvDdMr6bn+jh8Nte6oRg=";
+        hash = "sha256-tGJhO5ij2ME2ArTj63tVOY4Tdwpq94ewb7BagNcr4gQ=";
       };
 
       patches = [
@@ -48,7 +49,7 @@ let
 
       passthru = {
         mitmCache = finalAttrs.mitmCache;
-        updateScript = nix-update-script { };
+        updateScript = nix-update-script { extraArgs = [ "--flake" ]; };
       };
 
       mitmCache = gradle.fetchDeps {

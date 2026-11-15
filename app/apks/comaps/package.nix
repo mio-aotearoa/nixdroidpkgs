@@ -23,7 +23,7 @@
   nix-update-script,
 }:
 let
-  version = "2026.10.05-19";
+  version = "2026.11.07-16";
   versionParts = builtins.match "([0-9]{4}\\.[0-9]{2}\\.[0-9]{2})-([0-9]+).*" version;
   versionDate = builtins.elemAt versionParts 0;
   versionCount = builtins.elemAt versionParts 1;
@@ -52,9 +52,10 @@ let
       src = fetchFromGitHub {
         owner = "comaps";
         repo = "comaps";
+        name = "comaps-${finalAttrs.version}-source";
         tag = "v${finalAttrs.version}";
         fetchSubmodules = true;
-        hash = "sha256-EN23jI+o1AFuCDig2+ZTx96PvshruyuwKZguqWHcG8Q=";
+        hash = "sha256-wKpbcWdhu+GPrs+9yt62cnmCGRP5L3SxrbUed13gK7w=";
       };
 
       sourceRoot = "${finalAttrs.src.name}/android";
@@ -195,7 +196,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)' \
         runHook postInstall
       '';
 
-      passthru.updateScript = nix-update-script { };
+      passthru.updateScript = nix-update-script { extraArgs = [ "--flake" ]; };
       meta = with lib; {
         sourceProvenance = with sourceTypes; [ fromSource ];
         description = "CoMaps offline maps app (F-Droid flavor, source-built)";

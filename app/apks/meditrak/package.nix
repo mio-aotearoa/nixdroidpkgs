@@ -7,6 +7,7 @@
   fetchFromGitHub,
   fetchurl,
   unzip,
+  nix-update-script,
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
@@ -43,13 +44,14 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "meditrak";
-      version = "0.17.14";
+      version = "0.17.20";
 
       src = fetchFromGitHub {
         owner = "AdamGuidarini";
         repo = "MediTrak";
+        name = "meditrak-${finalAttrs.version}-source";
         tag = "v${finalAttrs.version}";
-        hash = "sha256-cBCZnW8JqdmOBQDbtXgBffxBJbA7HVNbSN/4n3ebKRg=";
+        hash = "sha256-KGC3liZFoWawbLTdPqoIyYyonE+j0IxVRnLAL7U5T6k=";
       };
 
       patches = [
@@ -68,18 +70,15 @@ let
         cp ${nlohmannJsonHeader} app/src/main/cpp/json/nlohmann/json.hpp
 
         substituteInPlace app/build.gradle \
-          --replace-fail "            version '3.22.1'" "            version '3.31.6'"
+          --replace-fail "            version '3.22.1'" "            version '3.31.6'" \
+          --replace-fail 'signingConfig = signingConfigs.debug' 'signingConfig = null'
       '';
 
       gradleBuildTask = ":app:assembleRelease";
       gradleUpdateTask = finalAttrs.gradleBuildTask;
+      passthru.updateScript = nix-update-script { extraArgs = [ "--flake" ]; };
 
-      # Lock refresh steps:
-      # 1. If MediTrak bumps Gradle, update gradle.version and gradle.hash.
-      # 2. Build the updater:
-      #    nix build --impure .#meditrak.mitmCache.updateScript
-      # 3. Run the resulting fetch-deps.sh from the repo root to regenerate
-      #    app/meditrak/meditrak_deps.json.
+      # Update source and regenerate dependencies with nix-update -F -u apk_meditrak.
       mitmCache = gradle.fetchDeps {
         inherit (finalAttrs) pname;
         pkg = finalAttrs.finalPackage;
@@ -125,9 +124,10 @@ let
 
       installPhase = ''
         runHook preInstall
-        install -Dm644 \
-          app/build/outputs/apk/release/app-release-unsigned.apk \
-          "$out/meditrak.apk"
+        apks=(app/build/outputs/apk/release/*.apk)
+        test "''${#apks[@]}" -eq 1
+        mkdir -p "$out"
+        mv "''${apks[0]}" "$out/meditrak.apk"
         runHook postInstall
       '';
 
