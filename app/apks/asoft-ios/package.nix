@@ -9,18 +9,19 @@
   unzip,
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
-  nix-update-script,
+  writeShellScriptBin,
+  nix-update,
 }:
 let
-  version = "0.1.5";
+  version = "0.1.6";
 
   # Upstream ships QEMU engines, Turnip, and the Apple-setup helper VM outside git
   # (pull-libs.sh / pull-libs26.sh / pull-setup.sh). Reuse the matching release APK
   # as a fixed-output source for those binaries; Java/CMake still build from tag.
-  # When bumping version, also refresh this hash (nix-update only covers src + mitm).
+  # updateScript refreshes this hash via passthru.updateDeps after nix-update.
   prebuiltsApk = fetchurl {
     url = "https://github.com/alpersamur3/asoft-ios-android/releases/download/v${version}/ASoftware-iOS-Android-${version}.apk";
-    hash = "sha256-0sHOd1nB5jk5T08Yk/N6qJcZHqj5yfmCKenkUUf6Sv8=";
+    hash = "sha256-vvvMGzHYPxZocAEDAKKjAuNXCn02ItjenAL9iW7qoM8=";
   };
 
   androidSdk = androidSdkBuilder (s: [
@@ -48,7 +49,7 @@ let
       owner = "alpersamur3";
       repo = "asoft-ios-android";
       tag = "v${finalAttrs.version}";
-      hash = "sha256-+gOfcXVM+1EipdZi3793taKzIDIHB62bPQP0gwLBs78=";
+      hash = "sha256-nfjJSd48YhjRtXab5BcVyARz+xC1dhE6psBFLjubNRU=";
     };
 
     gradleBuildTask = ":app:assembleRelease";
@@ -156,8 +157,23 @@ let
     '';
 
     passthru = {
-      updateScript = nix-update-script { };
       inherit prebuiltsApk;
+      updateDeps = [ "prebuiltsApk" ];
+      updateScript = writeShellScriptBin "update-asoft-ios" ''
+        set -euo pipefail
+
+        package_file="app/apks/asoft-ios/package.nix"
+        package_attr=".#apk_asoft-ios"
+        fake_hash="${lib.fakeHash}"
+
+        . "${../_shared/update-script-helpers.sh}"
+
+        ${lib.getExe nix-update} --flake --src-only --version-regex='^v?([0-9]+\.[0-9]+\.[0-9]+)$' apk_asoft-ios
+
+        refresh_update_deps ${lib.concatStringsSep " " finalAttrs.passthru.updateDeps}
+
+        refresh_mitm_cache
+      '';
     };
 
     meta = with lib; {

@@ -150,13 +150,13 @@ let
     in
     {
       pname = "koiterminal";
-      version = "2026110200-unstable-2026-11-05";
+      version = "2026110200-unstable-2026-11-14";
 
       src = fetchFromGitHub {
         owner = "outlawsanzhang";
         repo = "koiTerminal";
-        rev = "2da79b162bb115fe6bf71956710426ae6260f108";
-        hash = "sha256-3pIzpaeFCzSCIdbvi82J6pXpTL7Ufd/G+udZm6mY8e4=";
+        rev = "80a1cf16acd562394cec2cb8c63e2fac04aea7ce";
+        hash = "sha256-8Nape86sKDmKwErBgKWbh2Dak5eFstRrRskLkPlr6VA=";
       };
 
       sourceRoot = "${finalAttrs0.src.name}/AndroidStudioProject";
