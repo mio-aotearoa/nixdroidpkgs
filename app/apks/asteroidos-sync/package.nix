@@ -37,7 +37,10 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "asteroidos-sync";
-      version = "0.29-unstable-2026-10-17";
+      # Upstream app versionName is 0.29; nix version tracks the unstable rev + our patch train.
+      upstreamVersionName = "0.29";
+      patchVersion = "p1";
+      version = "0.29-unstable-2026-10-17+${finalAttrs.patchVersion}";
 
       src = fetchFromGitHub {
         owner = "AsteroidOS";
@@ -59,6 +62,9 @@ let
         chmod -R u+w app/src/main/java/github
         substituteInPlace app/src/main/java/github/vatsal/easyweather/retrofit/api/ApiClient.java \
           --replace-fail 'import android.support.annotation.NonNull;' 'import androidx.annotation.NonNull;'
+        substituteInPlace app/build.gradle.kts \
+          --replace-fail 'versionName = "${finalAttrs.upstreamVersionName}"' \
+          'versionName = "${finalAttrs.upstreamVersionName}+${finalAttrs.patchVersion}"'
       '';
 
       gradleBuildTask = ":app:assembleRelease";

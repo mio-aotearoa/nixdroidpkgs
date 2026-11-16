@@ -40,11 +40,14 @@ let
     in
     buildGradlePackage rec {
       pname = "gadgetbridge";
-      version = "2026.11.1";
+      # Upstream tag; Android versionName / nix version append +<patchVersion>.
+      upstreamVersion = "2026.11.1";
+      patchVersion = "p1";
+      version = "${upstreamVersion}+${patchVersion}";
 
       src = fetchgit {
         url = "https://codeberg.org/Freeyourgadget/Gadgetbridge.git";
-        rev = version;
+        rev = upstreamVersion;
         fetchSubmodules = true;
         hash = "sha256-az1Q/XXX4BOpKsCm+X0kW3zMLO3bguJthOaxke3whKA=";
       };
@@ -92,6 +95,8 @@ let
       __noChroot = stdenv.hostPlatform.isDarwin;
 
       postPatch = ''
+        substituteInPlace app/build.gradle \
+          --replace-fail 'versionName "${upstreamVersion}"' 'versionName "${version}"'
         substituteInPlace GBProtobufGenerator/build.gradle.kts \
           --replace-fail 'artifact = libs.protoc.get().toString()' 'path = "${protobuf}/bin/protoc"'
         rm -f external/jerryscript/tools/babel/package.json
