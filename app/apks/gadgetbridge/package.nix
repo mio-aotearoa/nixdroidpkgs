@@ -55,6 +55,7 @@ let
         ./fix-fossil-hr-build.patch
         ./asteroidos-find-phone.patch
         ./asteroidos-app-bridge.patch
+        ./asteroidos-sync-time-default.patch
       ];
 
       gradleBuildFlags = [ ":app:assembleMainlineRelease" ];

@@ -1,0 +1,19 @@
+--- a/app/src/main/java/org/asteroidos/sync/connectivity/TimeService.java
++++ b/app/src/main/java/org/asteroidos/sync/connectivity/TimeService.java
+@@ -54,8 +54,16 @@ public class TimeService implements IConnectivityService, SharedPreferences.OnSh
+     public TimeService(Context ctx, IAsteroidDevice device) {
+         mDevice = device;
+         mCtx = ctx;
+         mTimeSyncSettings = ctx.getSharedPreferences(PREFS_NAME, 0);
++        // Matawaa / AsteroidOS watches rely on phone→watch BLE time sync (no
++        // writable RTC). Persist the upstream default so synchronize-time stays
++        // on before the device-detail checkbox is opened.
++        if (!mTimeSyncSettings.contains(PREFS_SYNC_TIME)) {
++            mTimeSyncSettings.edit()
++                    .putBoolean(PREFS_SYNC_TIME, PREFS_SYNC_TIME_DEFAULT)
++                    .apply();
++        }
+         mTimeSyncSettings.registerOnSharedPreferenceChangeListener(this);
+     }
+ 
+     @Override

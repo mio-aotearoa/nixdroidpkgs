@@ -1,0 +1,16 @@
+--- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/GBApplication.java
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/GBApplication.java
+@@ -258,6 +258,13 @@
+         }
+ 
+         migratePrefsIfNeeded();
++        // Matawaa / AsteroidOS watches have no writable RTC; phone→watch time sync is
++        // the primary clock source. Persist the upstream default explicitly so the
++        // preference is on before the first device connects (and the settings UI
++        // matches GBPrefs.syncTime()).
++        if (!sharedPrefs.contains("datetime_synconconnect")) {
++            sharedPrefs.edit().putBoolean("datetime_synconconnect", true).apply();
++        }
+         updateApplicationNightMode();
+         sharedPrefs.registerOnSharedPreferenceChangeListener(themePreferenceListener);
+ 
