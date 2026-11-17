@@ -58,8 +58,8 @@ let
       # https://github.com/GrapheneOS/Camera/pull/664
       ./scan-from-image.patch
 
-      # Opt-in smartwatch remote shutter via permission-protected companion-app broadcasts
-      # (no network access, no exported entry points)
+      # Opt-in smartwatch remote shutter (first-launch prompt + More settings) via
+      # permission-protected companion-app broadcasts (no network, no exported entry points)
       ./remote-shutter-bridge.patch
     ];
 

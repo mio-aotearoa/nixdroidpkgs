@@ -18,6 +18,7 @@
 
 package org.asteroidos.sync.connectivity;
 
+import android.app.BroadcastOptions;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -283,7 +284,15 @@ public class AppBridgeService implements IConnectivityService {
                 .putExtra(EXTRA_APP_ID, CAMERA_APP_ID)
                 .putExtra(EXTRA_ACTION, action)
                 .putExtra(EXTRA_PAYLOAD, payload);
-        mCtx.sendBroadcast(intent, PERMISSION_APP_BRIDGE);
+        // Share identity so Camera can verify we are AsteroidOS Sync via sentFromUid.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            Bundle options = BroadcastOptions.makeBasic()
+                    .setShareIdentityEnabled(true)
+                    .toBundle();
+            mCtx.sendBroadcast(intent, PERMISSION_APP_BRIDGE, options);
+        } else {
+            mCtx.sendBroadcast(intent, PERMISSION_APP_BRIDGE);
+        }
     }
 
     /** Handles status updates from the companion apps that are meant for the watch. */

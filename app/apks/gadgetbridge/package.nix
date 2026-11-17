@@ -42,7 +42,7 @@ let
       pname = "gadgetbridge";
       # Upstream tag; Android versionName / nix version append +<patchVersion>.
       upstreamVersion = "2026.11.1";
-      patchVersion = "p1";
+      patchVersion = "p2";
       version = "${upstreamVersion}+${patchVersion}";
 
       src = fetchgit {

@@ -46,10 +46,11 @@ diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devi
 index ed648c4..b60b4e6 100644
 --- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
 +++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
-@@ -32,6 +32,25 @@ import java.util.GregorianCalendar;
+@@ -32,6 +32,26 @@ import java.util.GregorianCalendar;
  import java.util.Objects;
  import java.util.UUID;
  
++import android.app.BroadcastOptions;
 +import android.app.Notification;
 +import android.app.NotificationChannel;
 +import android.app.NotificationManager;
@@ -111,7 +112,7 @@ index ed648c4..b60b4e6 100644
          builder.setDeviceState(GBDevice.State.INITIALIZED);
  
          batteryInfoProfile.requestBatteryInfo(builder);
-@@ -331,6 +360,272 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
+@@ -331,6 +361,280 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
          evaluateGBDeviceEvent(findPhoneEvent);
      }
  
@@ -352,7 +353,15 @@ index ed648c4..b60b4e6 100644
 +                .putExtra("extra_app_id", CAMERA_APP_ID)
 +                .putExtra("extra_action", action)
 +                .putExtra("extra_payload", payload);
-+        getContext().sendBroadcast(broadcast, APP_BRIDGE_PERMISSION);
++        // Share identity so Camera can verify we are Gadgetbridge via sentFromUid.
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
++            final Bundle options = BroadcastOptions.makeBasic()
++                    .setShareIdentityEnabled(true)
++                    .toBundle();
++            getContext().sendBroadcast(broadcast, APP_BRIDGE_PERMISSION, options);
++        } else {
++            getContext().sendBroadcast(broadcast, APP_BRIDGE_PERMISSION);
++        }
 +    }
 +
 +    private void sendAppBridgeMessage(String wireAppId, String action) {
