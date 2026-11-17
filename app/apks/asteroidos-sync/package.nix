@@ -17,6 +17,7 @@ let
         s.cmdline-tools-latest
         s.platform-tools
         s.platforms-android-33
+        s.platforms-android-34
         s.build-tools-30-0-3
         s.build-tools-33-0-2
       ]);
@@ -63,6 +64,7 @@ let
         substituteInPlace app/src/main/java/github/vatsal/easyweather/retrofit/api/ApiClient.java \
           --replace-fail 'import android.support.annotation.NonNull;' 'import androidx.annotation.NonNull;'
         substituteInPlace app/build.gradle.kts \
+          --replace-fail 'compileSdk = 33' 'compileSdk = 34' \
           --replace-fail 'versionName = "${finalAttrs.upstreamVersionName}"' \
           'versionName = "${finalAttrs.upstreamVersionName}+${finalAttrs.patchVersion}"'
       '';
