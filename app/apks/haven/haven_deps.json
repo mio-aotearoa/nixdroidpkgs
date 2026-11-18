@@ -73,6 +73,7 @@
    "pom": "sha256-OG3EDKbc5wRaaIn7RsU8mchJtqVYSkgpcRKfH0rHclU="
   },
   "androidx/annotation#annotation-jvm/1.8.1": {
+   "jar": "sha256-mqsybZSSgAmRhUNgrCSPSTzn98MYNRkwm3is6eJA9vY=",
    "module": "sha256-yVnjsM3HXBXv4BYF+laqefAz45I44VBji4+r3mqhIaA=",
    "pom": "sha256-1JIDczqm+uBGw6PeTnlu7TR1lXVUhqZCc5iYRHWXULQ="
   },
