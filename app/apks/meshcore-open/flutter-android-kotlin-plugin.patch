@@ -1,0 +1,17 @@
+Apply the Kotlin Android plugin before configuring compilerOptions.
+Generated against file_selector_android 0.5.2+11; the same plugins block is
+used by image_picker_android, url_launcher_android and shared_preferences_android.
+Source: https://pub.dev/packages/file_selector_android/versions/0.5.2+11
+Project/author: Flutter packages / The Flutter Authors
+License: BSD-3-Clause (upstream LICENSE)
+
+--- a/android/build.gradle.kts
++++ b/android/build.gradle.kts
+@@ -23,6 +23,7 @@
+ 
+ plugins {
+     id("com.android.library")
++    id("org.jetbrains.kotlin.android")
+ }
+ 
+ kotlin {
