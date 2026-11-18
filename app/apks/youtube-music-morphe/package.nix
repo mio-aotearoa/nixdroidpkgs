@@ -19,7 +19,7 @@ let
     in
     stdenv.mkDerivation {
       pname = "youtube-music-morphe";
-      version = "9.42.52-patches-${morphe-patches.version}";
+      version = "9.44.52-patches-${morphe-patches.version}";
 
       dontUnpack = true;
 
