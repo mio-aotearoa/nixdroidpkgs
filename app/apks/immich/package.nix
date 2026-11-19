@@ -183,14 +183,14 @@ let
       in
       {
         pname = "immich";
-        version = "3.4.1";
+        version = "3.4.2";
 
         baseSrc = fetchFromGitHub {
           owner = "immich-app";
           repo = "immich";
           tag = "v${finalAttrs.version}";
           fetchSubmodules = true;
-          hash = "sha256-0B4oEMhpp5coy4fXGTgirVeYA1d2YfYYQShkFE2AQK0=";
+          hash = "sha256-2jRpxziLFhq7RVtgApx7j47Jh2Qhs70UQiIHEstmlxs=";
         };
 
         src = applyPatches {
