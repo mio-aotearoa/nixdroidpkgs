@@ -1,0 +1,28 @@
+Use Nix-fetched Android runtime bundles during offline builds.
+Generated against llamadart 0.8.24's hook/build.dart.
+Source: https://pub.dev/packages/llamadart/versions/0.8.24
+Project/author: llamadart / Jhin Lee (leehack)
+License: MIT (upstream LICENSE)
+
+--- a/hook/build.dart
++++ b/hook/build.dart
+@@ -1974,6 +1974,19 @@
+   required Duration transferTimeout,
+   required http.Client Function()? createClient,
+ }) async {
++  const vendoredBundles = <String, String>{
++    'llamadart-native-android-arm64': '@llamadartNativeAndroidArm64@',
++    'llamadart-native-android-x64': '@llamadartNativeAndroidX64@',
++    'litert-lm-native-runtime-android-arm64': '@litertLMNativeAndroidArm64@',
++    'litert-lm-native-runtime-android-x64': '@litertLMNativeAndroidX64@',
++  };
++  for (final bundle in vendoredBundles.entries) {
++    if (url.contains(bundle.key)) {
++      await File(bundle.value).copy(destination.path);
++      return;
++    }
++  }
++
+   final client = (createClient ?? http.Client.new)();
+   final temporaryDestination = File('${destination.path}.tmp');
+   try {

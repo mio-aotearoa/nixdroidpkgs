@@ -30,14 +30,14 @@ let
 
   appPackage = stdenv.mkDerivation (finalAttrs: {
     pname = "archivetune";
-    version = "15.1.0";
+    version = "16.0.0";
 
     src = fetchFromGitHub {
       owner = "koiverse";
       repo = "ArchiveTune";
       tag = "v${finalAttrs.version}";
       fetchSubmodules = true;
-      hash = "sha256-zDMBQXMygvc+7JKUCWYmX2YABEpvZXREi3z2NM8CnKA=";
+      hash = "sha256-9U0O7L3mnazsbQyafcrG+32N8ArlI1fobanV/FKL0ug=";
     };
 
     patches = [
