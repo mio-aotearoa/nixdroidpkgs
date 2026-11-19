@@ -401,7 +401,7 @@
     },
     "grapheneos_pdfviewer": {
         "cargoLock": null,
-        "date": "2026-11-17",
+        "date": "2026-11-19",
         "extract": null,
         "name": "grapheneos_pdfviewer",
         "passthru": null,
@@ -411,17 +411,17 @@
             "fetchSubmodules": false,
             "leaveDotGit": false,
             "name": null,
-            "rev": "d9c362f229b47f056edaca9aa5665bf8a16f7054",
-            "sha256": "sha256-XWG5Hhw6fNcH3W25c+rVBG+UEimWrvkiEoucUpv2pvo=",
+            "rev": "7326dea85e48ccae95ab7f10fd1fe3721323bb60",
+            "sha256": "sha256-WSwzqwhcxwixoV6tz60i7vbwNNBHBm4TAZoXTUVoEgc=",
             "sparseCheckout": [],
             "type": "git",
             "url": "https://github.com/GrapheneOS/PdfViewer.git"
         },
-        "version": "d9c362f229b47f056edaca9aa5665bf8a16f7054"
+        "version": "7326dea85e48ccae95ab7f10fd1fe3721323bb60"
     },
     "grapheneos_vanadium": {
         "cargoLock": null,
-        "date": "2026-11-12",
+        "date": "2026-11-19",
         "extract": null,
         "name": "grapheneos_vanadium",
         "passthru": null,
@@ -431,13 +431,13 @@
             "fetchSubmodules": false,
             "leaveDotGit": false,
             "name": null,
-            "rev": "17a788f57d9d9031031084bea9d5d54f9dc28f30",
-            "sha256": "sha256-IpQD3i9hsYjKR7A9uZlnUHV2lUrQ0DUNcABSU2EwuzQ=",
+            "rev": "a41a42840cf655b148eb0f22514baa0888803011",
+            "sha256": "sha256-1YWDbRoEODq4/TQ6i7gxzly0GRY3+TY6XNE5G9Othrk=",
             "sparseCheckout": [],
             "type": "git",
             "url": "https://gitlab.com/grapheneos/platform_external_vanadium.git"
         },
-        "version": "17a788f57d9d9031031084bea9d5d54f9dc28f30"
+        "version": "a41a42840cf655b148eb0f22514baa0888803011"
     },
     "gta4xlwifi-evobka-kernel": {
         "cargoLock": null,
@@ -861,7 +861,7 @@
     },
     "lineage_launcher3": {
         "cargoLock": null,
-        "date": "2026-11-15",
+        "date": "2026-11-17",
         "extract": null,
         "name": "lineage_launcher3",
         "passthru": null,
@@ -871,13 +871,13 @@
             "fetchSubmodules": false,
             "leaveDotGit": false,
             "name": null,
-            "rev": "ee4a31eaf8e57f8e3eeff6a58508de92a1361972",
-            "sha256": "sha256-tWJaCtfq+VToHxM0zKLht80dsNLKq27rpQu55nDyxqk=",
+            "rev": "0f245c5423ac47aa55d0ed45bb3e43aa9f3c249e",
+            "sha256": "sha256-I8HnekbjcJVu7SeUiiTfZ4bR6/uyQeJ0wad5iJ3hH7k=",
             "sparseCheckout": [],
             "type": "git",
             "url": "https://github.com/LineageOS/android_packages_apps_Launcher3.git"
         },
-        "version": "ee4a31eaf8e57f8e3eeff6a58508de92a1361972"
+        "version": "0f245c5423ac47aa55d0ed45bb3e43aa9f3c249e"
     },
     "lineage_prebuilts_bootmgr": {
         "cargoLock": null,
@@ -1428,7 +1428,7 @@
         "pinned": false,
         "src": {
             "name": null,
-            "sha256": "sha256-bo6Bzc6AZO7l+OzPnBVGrHS9rPg3UEbP6hYO7+rAuSw=",
+            "sha256": "sha256-ARpBJHLpd4yvfkq0bz77JDjJo7TbIOPU6GqGc3C6isg=",
             "type": "url",
             "url": "https://gitlab.com/MindTheGapps/vendor_gapps/-/archive/e14b22768c60978d0e1267dab5bcf62dfcc73d16/vendor_gapps-e14b22768c60978d0e1267dab5bcf62dfcc73d16.tar.gz"
         },

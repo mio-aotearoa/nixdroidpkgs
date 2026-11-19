@@ -288,31 +288,31 @@
   };
   grapheneos_pdfviewer = {
     pname = "grapheneos_pdfviewer";
-    version = "d9c362f229b47f056edaca9aa5665bf8a16f7054";
+    version = "7326dea85e48ccae95ab7f10fd1fe3721323bb60";
     src = fetchgit {
       url = "https://github.com/GrapheneOS/PdfViewer.git";
-      rev = "d9c362f229b47f056edaca9aa5665bf8a16f7054";
+      rev = "7326dea85e48ccae95ab7f10fd1fe3721323bb60";
       fetchSubmodules = false;
       deepClone = false;
       leaveDotGit = false;
       sparseCheckout = [ ];
-      sha256 = "sha256-XWG5Hhw6fNcH3W25c+rVBG+UEimWrvkiEoucUpv2pvo=";
+      sha256 = "sha256-WSwzqwhcxwixoV6tz60i7vbwNNBHBm4TAZoXTUVoEgc=";
     };
-    date = "2026-11-17";
+    date = "2026-11-19";
   };
   grapheneos_vanadium = {
     pname = "grapheneos_vanadium";
-    version = "17a788f57d9d9031031084bea9d5d54f9dc28f30";
+    version = "a41a42840cf655b148eb0f22514baa0888803011";
     src = fetchgit {
       url = "https://gitlab.com/grapheneos/platform_external_vanadium.git";
-      rev = "17a788f57d9d9031031084bea9d5d54f9dc28f30";
+      rev = "a41a42840cf655b148eb0f22514baa0888803011";
       fetchSubmodules = false;
       deepClone = false;
       leaveDotGit = false;
       sparseCheckout = [ ];
-      sha256 = "sha256-IpQD3i9hsYjKR7A9uZlnUHV2lUrQ0DUNcABSU2EwuzQ=";
+      sha256 = "sha256-1YWDbRoEODq4/TQ6i7gxzly0GRY3+TY6XNE5G9Othrk=";
     };
-    date = "2026-11-12";
+    date = "2026-11-19";
   };
   gta4xlwifi-evobka-kernel = {
     pname = "gta4xlwifi-evobka-kernel";
@@ -610,17 +610,17 @@
   };
   lineage_launcher3 = {
     pname = "lineage_launcher3";
-    version = "ee4a31eaf8e57f8e3eeff6a58508de92a1361972";
+    version = "0f245c5423ac47aa55d0ed45bb3e43aa9f3c249e";
     src = fetchgit {
       url = "https://github.com/LineageOS/android_packages_apps_Launcher3.git";
-      rev = "ee4a31eaf8e57f8e3eeff6a58508de92a1361972";
+      rev = "0f245c5423ac47aa55d0ed45bb3e43aa9f3c249e";
       fetchSubmodules = false;
       deepClone = false;
       leaveDotGit = false;
       sparseCheckout = [ ];
-      sha256 = "sha256-tWJaCtfq+VToHxM0zKLht80dsNLKq27rpQu55nDyxqk=";
+      sha256 = "sha256-I8HnekbjcJVu7SeUiiTfZ4bR6/uyQeJ0wad5iJ3hH7k=";
     };
-    date = "2026-11-15";
+    date = "2026-11-17";
   };
   lineage_prebuilts_bootmgr = {
     pname = "lineage_prebuilts_bootmgr";
@@ -1005,7 +1005,7 @@
     version = "e14b22768c60978d0e1267dab5bcf62dfcc73d16";
     src = fetchurl {
       url = "https://gitlab.com/MindTheGapps/vendor_gapps/-/archive/e14b22768c60978d0e1267dab5bcf62dfcc73d16/vendor_gapps-e14b22768c60978d0e1267dab5bcf62dfcc73d16.tar.gz";
-      sha256 = "sha256-bo6Bzc6AZO7l+OzPnBVGrHS9rPg3UEbP6hYO7+rAuSw=";
+      sha256 = "sha256-ARpBJHLpd4yvfkq0bz77JDjJo7TbIOPU6GqGc3C6isg=";
     };
     date = "2026-09-13";
   };
