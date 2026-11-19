@@ -46,7 +46,7 @@ diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devi
 index ed648c4..b60b4e6 100644
 --- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
 +++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
-@@ -32,6 +32,26 @@ import java.util.GregorianCalendar;
+@@ -32,6 +32,35 @@ import java.util.GregorianCalendar;
  import java.util.Objects;
  import java.util.UUID;
  
@@ -66,8 +66,17 @@ index ed648c4..b60b4e6 100644
 +import androidx.core.app.NotificationCompat;
 +import androidx.core.app.RemoteInput;
 +import androidx.core.content.ContextCompat;
++import android.content.SharedPreferences;
++import android.os.SystemClock;
++import java.io.ByteArrayOutputStream;
++import java.util.HashMap;
 +import java.util.HashSet;
++import java.util.Iterator;
++import java.util.Map;
 +import java.util.Set;
++import org.json.JSONArray;
++import org.json.JSONException;
++import org.json.JSONObject;
 +
 +import nodomain.freeyourgadget.gadgetbridge.GBApplication;
  import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
@@ -112,13 +121,16 @@ index ed648c4..b60b4e6 100644
          builder.setDeviceState(GBDevice.State.INITIALIZED);
  
          batteryInfoProfile.requestBatteryInfo(builder);
-@@ -331,6 +361,280 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
+@@ -331,6 +361,509 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
          evaluateGBDeviceEvent(findPhoneEvent);
      }
  
 +
 +    /*
-+     * App Bridge: relays smartwatch remote actions (camera remote, phone text input).
++     * App Bridge v2: Wear OS Data Layer inspired framed BLE tunnel
++     * (MessageClient, DataClient, CapabilityClient, ChannelClient).
++     *
++     * Wire header: [0xA1][ver=0x02][msgType][flags][msgId:2B BE][seq][total][appLen][app][pathLen][path][payload]
 +     */
 +    private static final String APP_BRIDGE_PERMISSION =
 +            "nodomain.freeyourgadget.gadgetbridge.permission.APP_BRIDGE";
@@ -126,23 +138,83 @@ index ed648c4..b60b4e6 100644
 +            "nodomain.freeyourgadget.gadgetbridge.ACTION_SEND_TO_WATCH";
 +    private static final String ACTION_RECEIVE_FROM_WATCH =
 +            "nodomain.freeyourgadget.gadgetbridge.ACTION_RECEIVE_FROM_WATCH";
++    private static final String EXTRA_APP_ID = "extra_app_id";
++    private static final String EXTRA_ACTION = "extra_action";
++    private static final String EXTRA_PAYLOAD = "extra_payload";
++    private static final String EXTRA_MSG_TYPE = "extra_msg_type";
++
++    private static final int AB_MAGIC = 0xA1;
++    private static final int AB_VERSION = 0x02;
++    private static final int AB_HEADER_FIXED = 10;
++    private static final int APP_BRIDGE_MAX_PACKET = 512;
++    private static final int AB_MAX_APP_LEN = 64;
++    private static final int AB_MAX_PATH_LEN = 128;
++    private static final int AB_MAX_CHUNKS = 32;
++    private static final int AB_CHUNK_SIZE = 384;
++    private static final int AB_MAX_PAYLOAD = AB_MAX_CHUNKS * AB_CHUNK_SIZE;
++
++    private static final int AB_MSG_MESSAGE = 0x01;
++    private static final int AB_MSG_DATA_PUT = 0x02;
++    private static final int AB_MSG_DATA_DEL = 0x03;
++    private static final int AB_MSG_DATA_GET = 0x04;
++    private static final int AB_MSG_CAP_QUERY = 0x05;
++    private static final int AB_MSG_CAP_RESP = 0x06;
++    private static final int AB_MSG_CHAN_DATA = 0x07;
++    private static final int AB_MSG_ACK = 0x08;
++    private static final int AB_MSG_PING = 0x09;
++    private static final int AB_MSG_PONG = 0x0A;
++
++    private static final int AB_FLAG_NONE = 0x00;
++    private static final int AB_FLAG_ACK_REQ = 0x01;
++    private static final int AB_FLAG_FIN = 0x02;
++
 +    private static final String CAMERA_PACKAGE = "app.grapheneos.camera";
 +    private static final String CAMERA_APP_ID = "org.asteroidos.camera";
 +    private static final String CAMERA_WIRE_APP_ID = "cam";
 +    private static final String KEYBOARD_APP_ID = "org.asteroidos.keyboard";
 +    private static final String KEYBOARD_WIRE_APP_ID = "kbd";
++    private static final String VELA_APP_ID = "org.asteroidos.vela";
++    private static final String VELA_WIRE_APP_ID = "vela";
++    private static final String SYSTEM_APP_ID = "org.asteroidos.system";
++    private static final String SYSTEM_WIRE_APP_ID = "sys";
 +    private static final int KEYBOARD_NOTIFICATION_ID = 0xA072;
 +    private static final String KEYBOARD_CHANNEL_ID = "asteroidos_keyboard_channel";
 +    private static final String ACTION_KEYBOARD_REPLY =
 +            "nodomain.freeyourgadget.gadgetbridge.KEYBOARD_INPUT_REPLY";
 +    private static final String EXTRA_KEYBOARD_TEXT = "extra_keyboard_text";
-+    private static final int APP_BRIDGE_MAX_PACKET = 512;
-+    private static final Set<String> WATCH_TO_PHONE_ACTIONS = new HashSet<>(Arrays.asList(
-+            "capture", "flip", "zoom_in", "zoom_out", "torch", "mode_photo", "mode_video",
-+            "status_query"));
-+    private static final Set<String> PHONE_TO_WATCH_ACTIONS = new HashSet<>(Arrays.asList(
-+            "ready", "paused", "photo_captured", "video_started", "video_stopped"));
++    private static final String PREFS_DATALAYER = "asteroidos_datalayer";
 +
++    private static final Set<String> WATCH_TO_PHONE_ACTIONS = new HashSet<>(Arrays.asList(
++            "capture", "flip", "zoom_in", "zoom_out", "torch",
++            "mode_photo", "mode_video", "timer_cycle", "status_query"));
++    private static final Set<String> PHONE_TO_WATCH_ACTIONS = new HashSet<>(Arrays.asList(
++            "ready", "paused", "photo_captured", "video_started", "video_stopped", "state_changed"));
++
++    private static final class AbReassembly {
++        final int msgType;
++        final String appId;
++        final String path;
++        final int total;
++        final boolean ackReq;
++        final byte[][] chunks;
++        final boolean[] seen;
++        final long createdMs;
++        int received = 0;
++
++        AbReassembly(int msgType, String appId, String path, int total, boolean ackReq) {
++            this.msgType = msgType;
++            this.appId = appId;
++            this.path = path;
++            this.total = total;
++            this.ackReq = ackReq;
++            this.chunks = new byte[total][];
++            this.seen = new boolean[total];
++            this.createdMs = SystemClock.elapsedRealtime();
++        }
++    }
++
++    private final Map<Integer, AbReassembly> abReassembly = new HashMap<>();
++    private int abNextMsgId = 1;
 +    private BroadcastReceiver appBridgeReceiver = null;
 +    private BroadcastReceiver keyboardReplyReceiver = null;
 +
@@ -175,8 +247,9 @@ index ed648c4..b60b4e6 100644
 +                Bundle results = RemoteInput.getResultsFromIntent(intent);
 +                if (results != null) {
 +                    CharSequence text = results.getCharSequence(EXTRA_KEYBOARD_TEXT);
-+                    if (text != null && text.length() > 0) {
-+                        sendAppBridgeMessage(KEYBOARD_WIRE_APP_ID, "commit", text.toString());
++                    if (text != null && text.length() > 0 && getDevice().isInitialized()) {
++                        sendAppBridgeFrames(AB_MSG_MESSAGE, KEYBOARD_WIRE_APP_ID, "commit",
++                                text.toString().getBytes(StandardCharsets.UTF_8), AB_FLAG_NONE);
 +                    }
 +                }
 +                cancelKeyboardInputNotification();
@@ -213,6 +286,15 @@ index ed648c4..b60b4e6 100644
 +        cancelKeyboardInputNotification();
 +    }
 +
++    private boolean isPackageInstalled(String pkg) {
++        try {
++            getContext().getPackageManager().getPackageInfo(pkg, 0);
++            return true;
++        } catch (PackageManager.NameNotFoundException e) {
++            return false;
++        }
++    }
++
 +    private boolean isSentFromCameraApp(final BroadcastReceiver receiver) {
 +        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false;
 +        final int sentFromUid = receiver.getSentFromUid();
@@ -222,6 +304,27 @@ index ed648c4..b60b4e6 100644
 +        } catch (PackageManager.NameNotFoundException e) {
 +            return false;
 +        }
++    }
++
++    private static String normalizeAppBridgeId(String id) {
++        if (CAMERA_WIRE_APP_ID.equals(id) || CAMERA_APP_ID.equals(id)) return CAMERA_APP_ID;
++        if (KEYBOARD_WIRE_APP_ID.equals(id) || KEYBOARD_APP_ID.equals(id)) return KEYBOARD_APP_ID;
++        if (VELA_WIRE_APP_ID.equals(id) || VELA_APP_ID.equals(id)) return VELA_APP_ID;
++        if (SYSTEM_WIRE_APP_ID.equals(id) || SYSTEM_APP_ID.equals(id)) return SYSTEM_APP_ID;
++        if (id != null && id.startsWith("org.asteroidos.") && id.length() <= AB_MAX_APP_LEN) return id;
++        return null;
++    }
++
++    private static String compactAppBridgeId(String canonical) {
++        if (CAMERA_APP_ID.equals(canonical)) return CAMERA_WIRE_APP_ID;
++        if (KEYBOARD_APP_ID.equals(canonical)) return KEYBOARD_WIRE_APP_ID;
++        if (VELA_APP_ID.equals(canonical)) return VELA_WIRE_APP_ID;
++        if (SYSTEM_APP_ID.equals(canonical)) return SYSTEM_WIRE_APP_ID;
++        return canonical;
++    }
++
++    private SharedPreferences getDataLayerPrefs() {
++        return GBApplication.getContext().getSharedPreferences(PREFS_DATALAYER, Context.MODE_PRIVATE);
 +    }
 +
 +    private void showKeyboardInputNotification(String prompt) {
@@ -285,75 +388,178 @@ index ed648c4..b60b4e6 100644
 +
 +    private void handleSendToWatchIntent(Intent intent, BroadcastReceiver receiver) {
 +        if (intent == null || !ACTION_SEND_TO_WATCH.equals(intent.getAction())) return;
-+        final String appId = intent.getStringExtra("extra_app_id");
-+        final String action = intent.getStringExtra("extra_action");
-+        final String payload = intent.getStringExtra("extra_payload");
++        if (!getDevice().isInitialized()) return;
++        final String appId = normalizeAppBridgeId(intent.getStringExtra(EXTRA_APP_ID));
++        final String path = intent.getStringExtra(EXTRA_ACTION);
++        final String payload = intent.getStringExtra(EXTRA_PAYLOAD);
++        final int msgType = intent.getIntExtra(EXTRA_MSG_TYPE, AB_MSG_MESSAGE);
++        if (appId == null || path == null || path.isEmpty() || path.length() > AB_MAX_PATH_LEN) return;
 +
-+        if (KEYBOARD_APP_ID.equals(appId)) {
-+            if (action != null && getDevice().isInitialized()) {
-+                sendAppBridgeMessage(KEYBOARD_WIRE_APP_ID, action, payload);
++        if (CAMERA_APP_ID.equals(appId)) {
++            if (!isSentFromCameraApp(receiver)) {
++                LOG.warn("AppBridge: dropping message not sent by {}", CAMERA_PACKAGE);
++                return;
++            }
++            if (msgType == AB_MSG_MESSAGE && !PHONE_TO_WATCH_ACTIONS.contains(path)) return;
++        }
++
++        final byte[] payloadBytes = payload != null ? payload.getBytes(StandardCharsets.UTF_8) : new byte[0];
++        if (payloadBytes.length > AB_MAX_PAYLOAD) return;
++
++        if (msgType == AB_MSG_DATA_PUT) {
++            getDataLayerPrefs().edit().putString(appId + "|" + path, payload != null ? payload : "").apply();
++        } else if (msgType == AB_MSG_DATA_DEL) {
++            getDataLayerPrefs().edit().remove(appId + "|" + path).apply();
++        }
++
++        final int flags = (msgType == AB_MSG_CHAN_DATA) ? (AB_FLAG_ACK_REQ | AB_FLAG_FIN) : AB_FLAG_NONE;
++        sendAppBridgeFrames(msgType, compactAppBridgeId(appId), path, payloadBytes, flags);
++    }
++
++    private void handleAppBridgeData(byte[] value) {
++        if (value == null || value.length < AB_HEADER_FIXED || value.length > APP_BRIDGE_MAX_PACKET) return;
++        if ((value[0] & 0xFF) != AB_MAGIC || (value[1] & 0xFF) != AB_VERSION) {
++            LOG.warn("AppBridge: unsupported header");
++            return;
++        }
++
++        final int msgType = value[2] & 0xFF;
++        final int flags = value[3] & 0xFF;
++        final int msgId = ((value[4] & 0xFF) << 8) | (value[5] & 0xFF);
++        final int seq = value[6] & 0xFF;
++        final int total = value[7] & 0xFF;
++
++        if (msgType == AB_MSG_ACK || msgType == AB_MSG_PONG) return;
++        if (msgType == AB_MSG_PING) {
++            sendAppBridgeControl(AB_MSG_PONG, msgId, Arrays.copyOfRange(value, AB_HEADER_FIXED, value.length));
++            return;
++        }
++        if (total == 0 || total > AB_MAX_CHUNKS || seq >= total) return;
++
++        int offset = 8;
++        final int appLen = value[offset++] & 0xFF;
++        if (appLen == 0 || appLen > AB_MAX_APP_LEN || value.length < offset + appLen + 1) return;
++        final String rawApp = new String(value, offset, appLen, StandardCharsets.UTF_8);
++        offset += appLen;
++
++        final int pathLen = value[offset++] & 0xFF;
++        if (pathLen == 0 || pathLen > AB_MAX_PATH_LEN || value.length < offset + pathLen) return;
++        final String path = new String(value, offset, pathLen, StandardCharsets.UTF_8);
++        offset += pathLen;
++
++        final String appId = normalizeAppBridgeId(rawApp);
++        if (appId == null) return;
++        final byte[] chunk = Arrays.copyOfRange(value, offset, value.length);
++
++        if (total == 1) {
++            if ((flags & AB_FLAG_ACK_REQ) != 0) sendAppBridgeControl(AB_MSG_ACK, msgId, new byte[0]);
++            dispatchAppBridgeDecoded(msgType, appId, path, chunk);
++            return;
++        }
++
++        synchronized (abReassembly) {
++            final long now = SystemClock.elapsedRealtime();
++            final Iterator<Map.Entry<Integer, AbReassembly>> it = abReassembly.entrySet().iterator();
++            while (it.hasNext()) {
++                if (now - it.next().getValue().createdMs > 10000L) it.remove();
++            }
++            AbReassembly st = abReassembly.get(msgId);
++            if (st == null) {
++                if (abReassembly.size() >= 8) return;
++                st = new AbReassembly(msgType, appId, path, total, (flags & AB_FLAG_ACK_REQ) != 0);
++                abReassembly.put(msgId, st);
++            }
++            if (st.total != total || st.msgType != msgType || !st.appId.equals(appId) || !st.path.equals(path)) return;
++            if (!st.seen[seq]) {
++                st.seen[seq] = true;
++                st.chunks[seq] = chunk;
++                st.received++;
++            }
++            if (st.received == st.total) {
++                final ByteArrayOutputStream bos = new ByteArrayOutputStream();
++                for (byte[] c : st.chunks) {
++                    if (c != null) bos.write(c, 0, c.length);
++                }
++                final boolean needAck = st.ackReq;
++                abReassembly.remove(msgId);
++                if (needAck) sendAppBridgeControl(AB_MSG_ACK, msgId, new byte[0]);
++                dispatchAppBridgeDecoded(msgType, appId, path, bos.toByteArray());
++            }
++        }
++    }
++
++    private void dispatchAppBridgeDecoded(int msgType, String appId, String path, byte[] payloadBytes) {
++        if (payloadBytes.length > AB_MAX_PAYLOAD) return;
++        final String payload = new String(payloadBytes, StandardCharsets.UTF_8);
++
++        if (msgType == AB_MSG_CAP_QUERY) {
++            try {
++                final JSONArray caps = new JSONArray();
++                caps.put("protocol_v2");
++                caps.put("keyboard_input");
++                caps.put("datalayer_v2");
++                caps.put("channel_stream");
++                caps.put("vela_interconnect");
++                if (isPackageInstalled(CAMERA_PACKAGE)) caps.put("camera_remote_v2");
++                final JSONObject obj = new JSONObject();
++                obj.put("version", AB_VERSION);
++                obj.put("capabilities", caps);
++                sendAppBridgeFrames(AB_MSG_CAP_RESP, SYSTEM_WIRE_APP_ID, "/capabilities",
++                        obj.toString().getBytes(StandardCharsets.UTF_8), AB_FLAG_NONE);
++            } catch (JSONException e) {
++                LOG.warn("AppBridge: failed to encode capabilities", e);
 +            }
 +            return;
 +        }
-+
-+        if (!CAMERA_APP_ID.equals(appId)) return;
-+        if (!isSentFromCameraApp(receiver)) {
-+            LOG.warn("AppBridge: dropping message not sent by {}", CAMERA_PACKAGE);
++        if (msgType == AB_MSG_DATA_PUT) {
++            getDataLayerPrefs().edit().putString(appId + "|" + path, payload).apply();
++            broadcastAppBridge(msgType, appId, path, payload, null);
 +            return;
 +        }
-+        if (action == null || !PHONE_TO_WATCH_ACTIONS.contains(action)) return;
-+        if (!getDevice().isInitialized()) return;
-+        sendAppBridgeMessage(CAMERA_WIRE_APP_ID, action, payload);
-+    }
-+
-+    /**
-+     * Process incoming App Bridge frame from AsteroidOS.
-+     * Format: [0xA0][appIdLen:1B][appId][actionLen:1B][action][payload]
-+     */
-+    private void handleAppBridgeData(byte[] value) {
-+        if (value == null || value.length < 3 || value.length > APP_BRIDGE_MAX_PACKET) {
++        if (msgType == AB_MSG_DATA_DEL) {
++            getDataLayerPrefs().edit().remove(appId + "|" + path).apply();
++            broadcastAppBridge(msgType, appId, path, "", null);
 +            return;
 +        }
-+        if ((value[0] & 0xFF) != 0xA0) {
-+            LOG.warn("AppBridge: invalid magic byte 0x{}", Integer.toHexString(value[0] & 0xFF));
++        if (msgType == AB_MSG_DATA_GET) {
++            final SharedPreferences prefs = getDataLayerPrefs();
++            final String key = appId + "|" + path;
++            if (prefs.contains(key)) {
++                final String val = prefs.getString(key, "");
++                sendAppBridgeFrames(AB_MSG_DATA_PUT, compactAppBridgeId(appId), path,
++                        val.getBytes(StandardCharsets.UTF_8), AB_FLAG_NONE);
++            }
 +            return;
 +        }
-+        int offset = 1;
-+        final int appIdLen = value[offset++] & 0xFF;
-+        if (value.length < offset + appIdLen + 1) return;
-+        final String appId = new String(value, offset, appIdLen, StandardCharsets.UTF_8);
-+        offset += appIdLen;
-+
-+        final int actionLen = value[offset++] & 0xFF;
-+        if (value.length < offset + actionLen) return;
-+        final String action = new String(value, offset, actionLen, StandardCharsets.UTF_8);
-+        offset += actionLen;
-+
-+        String payload = "";
-+        if (value.length > offset) {
-+            payload = new String(value, offset, value.length - offset, StandardCharsets.UTF_8);
++        if (msgType == AB_MSG_CHAN_DATA) {
++            broadcastAppBridge(msgType, appId, path, payload, null);
++            return;
 +        }
++        if (msgType != AB_MSG_MESSAGE) return;
 +
-+        if (KEYBOARD_WIRE_APP_ID.equals(appId)) {
-+            if ("request_input".equals(action) || "open".equals(action)) {
++        if (KEYBOARD_APP_ID.equals(appId)) {
++            if ("request_input".equals(path) || "open".equals(path)) {
 +                showKeyboardInputNotification(payload);
-+            } else if ("close".equals(action)) {
++            } else if ("close".equals(path)) {
 +                cancelKeyboardInputNotification();
 +            }
 +            return;
 +        }
-+
-+        if (!CAMERA_WIRE_APP_ID.equals(appId) || !WATCH_TO_PHONE_ACTIONS.contains(action)) {
-+            LOG.debug("AppBridge: ignoring frame for unsupported app or action");
++        if (CAMERA_APP_ID.equals(appId)) {
++            if (!WATCH_TO_PHONE_ACTIONS.contains(path)) return;
++            broadcastAppBridge(msgType, CAMERA_APP_ID, path, payload, CAMERA_PACKAGE);
 +            return;
 +        }
++        broadcastAppBridge(msgType, appId, path, payload, null);
++    }
 +
++    private void broadcastAppBridge(int msgType, String appId, String path, String payload, String targetPkg) {
 +        final Intent broadcast = new Intent(ACTION_RECEIVE_FROM_WATCH)
-+                .setPackage(CAMERA_PACKAGE)
-+                .putExtra("extra_app_id", CAMERA_APP_ID)
-+                .putExtra("extra_action", action)
-+                .putExtra("extra_payload", payload);
-+        // Share identity so Camera can verify we are Gadgetbridge via sentFromUid.
++                .putExtra(EXTRA_MSG_TYPE, msgType)
++                .putExtra(EXTRA_APP_ID, appId)
++                .putExtra(EXTRA_ACTION, path)
++                .putExtra(EXTRA_PAYLOAD, payload);
++        if (targetPkg != null) broadcast.setPackage(targetPkg);
 +        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
 +            final Bundle options = BroadcastOptions.makeBasic()
 +                    .setShareIdentityEnabled(true)
@@ -364,28 +570,60 @@ index ed648c4..b60b4e6 100644
 +        }
 +    }
 +
-+    private void sendAppBridgeMessage(String wireAppId, String action) {
-+        sendAppBridgeMessage(wireAppId, action, null);
++    private synchronized void sendAppBridgeFrames(int msgType, String wireAppId, String path, byte[] payload, int flags) {
++        final byte[] appBytes = wireAppId.getBytes(StandardCharsets.UTF_8);
++        final byte[] pathBytes = path.getBytes(StandardCharsets.UTF_8);
++        final int headerOverhead = AB_HEADER_FIXED + appBytes.length + pathBytes.length;
++        final int maxChunk = Math.min(AB_CHUNK_SIZE, APP_BRIDGE_MAX_PACKET - headerOverhead);
++        if (maxChunk <= 0) return;
++        final int total = Math.max(1, (payload.length + maxChunk - 1) / maxChunk);
++        if (total > AB_MAX_CHUNKS) return;
++
++        final int msgId = abNextMsgId++;
++        if (abNextMsgId > 0xFFFF) abNextMsgId = 1;
++
++        final TransactionBuilder builder = createTransactionBuilder("sendAppBridgeFrames");
++        for (int seq = 0; seq < total; seq++) {
++            final int start = seq * maxChunk;
++            final int len = Math.min(maxChunk, Math.max(0, payload.length - start));
++            final int chunkFlags = (seq == total - 1) ? flags : (flags & ~AB_FLAG_FIN);
++            final byte[] packet = new byte[headerOverhead + len];
++            int idx = 0;
++            packet[idx++] = (byte) AB_MAGIC;
++            packet[idx++] = (byte) AB_VERSION;
++            packet[idx++] = (byte) msgType;
++            packet[idx++] = (byte) chunkFlags;
++            packet[idx++] = (byte) ((msgId >> 8) & 0xFF);
++            packet[idx++] = (byte) (msgId & 0xFF);
++            packet[idx++] = (byte) seq;
++            packet[idx++] = (byte) total;
++            packet[idx++] = (byte) appBytes.length;
++            System.arraycopy(appBytes, 0, packet, idx, appBytes.length);
++            idx += appBytes.length;
++            packet[idx++] = (byte) pathBytes.length;
++            System.arraycopy(pathBytes, 0, packet, idx, pathBytes.length);
++            idx += pathBytes.length;
++            if (len > 0) System.arraycopy(payload, start, packet, idx, len);
++            safeWriteToCharacteristic(builder, AsteroidOSConstants.APP_BRIDGE_RX_CHAR, packet);
++        }
++        builder.queue();
 +    }
 +
-+    private void sendAppBridgeMessage(String wireAppId, String action, String payload) {
-+        final byte[] appIdBytes = wireAppId.getBytes(StandardCharsets.UTF_8);
-+        final byte[] actionBytes = action.getBytes(StandardCharsets.UTF_8);
-+        final byte[] payloadBytes = payload != null ? payload.getBytes(StandardCharsets.UTF_8) : new byte[0];
-+        final byte[] packet = new byte[3 + appIdBytes.length + actionBytes.length + payloadBytes.length];
-+        int idx = 0;
-+        packet[idx++] = (byte) 0xA0;
-+        packet[idx++] = (byte) appIdBytes.length;
-+        System.arraycopy(appIdBytes, 0, packet, idx, appIdBytes.length);
-+        idx += appIdBytes.length;
-+        packet[idx++] = (byte) actionBytes.length;
-+        System.arraycopy(actionBytes, 0, packet, idx, actionBytes.length);
-+        idx += actionBytes.length;
-+        if (payloadBytes.length > 0) {
-+            System.arraycopy(payloadBytes, 0, packet, idx, payloadBytes.length);
-+        }
-+
-+        final TransactionBuilder builder = createTransactionBuilder("sendAppBridgeMessage");
++    private void sendAppBridgeControl(int msgType, int msgId, byte[] payload) {
++        final int len = payload != null ? Math.min(payload.length, APP_BRIDGE_MAX_PACKET - AB_HEADER_FIXED) : 0;
++        final byte[] packet = new byte[AB_HEADER_FIXED + len];
++        packet[0] = (byte) AB_MAGIC;
++        packet[1] = (byte) AB_VERSION;
++        packet[2] = (byte) msgType;
++        packet[3] = (byte) AB_FLAG_NONE;
++        packet[4] = (byte) ((msgId >> 8) & 0xFF);
++        packet[5] = (byte) (msgId & 0xFF);
++        packet[6] = 0;
++        packet[7] = 1;
++        packet[8] = 0;
++        packet[9] = 0;
++        if (len > 0) System.arraycopy(payload, 0, packet, AB_HEADER_FIXED, len);
++        final TransactionBuilder builder = createTransactionBuilder("sendAppBridgeControl");
 +        safeWriteToCharacteristic(builder, AsteroidOSConstants.APP_BRIDGE_RX_CHAR, packet);
 +        builder.queue();
 +    }

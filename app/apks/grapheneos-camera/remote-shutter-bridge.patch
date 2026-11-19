@@ -137,7 +137,7 @@ new file mode 100644
 index 00000000..05b47142
 --- /dev/null
 +++ b/app/src/main/java/app/grapheneos/camera/remote/WatchRemote.kt
-@@ -0,0 +1,203 @@
+@@ -0,0 +1,209 @@
 +package app.grapheneos.camera.remote
 +
 +import android.app.BroadcastOptions
@@ -181,6 +181,7 @@ index 00000000..05b47142
 +        TORCH("torch"),
 +        MODE_PHOTO("mode_photo"),
 +        MODE_VIDEO("mode_video"),
++        TIMER_CYCLE("timer_cycle"),
 +        STATUS_QUERY("status_query");
 +
 +        companion object {
@@ -194,6 +195,7 @@ index 00000000..05b47142
 +        PHOTO_CAPTURED("photo_captured"),
 +        VIDEO_STARTED("video_started"),
 +        VIDEO_STOPPED("video_stopped"),
++        STATE_CHANGED("state_changed"),
 +    }
 +
 +    class Bridge(
@@ -274,12 +276,15 @@ index 00000000..05b47142
 +        }
 +    }
 +
-+    fun sendStatus(status: Status) {
++    fun sendStatus(status: Status, payload: String? = null) {
 +        for (bridge in usableBridges(context)) {
 +            val intent = Intent(bridge.sendAction)
 +                .setPackage(bridge.pkg)
 +                .putExtra(EXTRA_APP_ID, WATCH_APP_ID)
 +                .putExtra(EXTRA_ACTION, status.wire)
++            if (!payload.isNullOrEmpty()) {
++                intent.putExtra(EXTRA_PAYLOAD, payload)
++            }
 +            // The receiver permission makes the system deliver only to the bridge app,
 +            // and only if it holds the permission it defined itself. Share identity so the
 +            // bridge can verify we are Camera via BroadcastReceiver.sentFromUid.
@@ -306,6 +311,7 @@ index 00000000..05b47142
 +        const val WATCH_APP_ID = "org.asteroidos.camera"
 +        const val EXTRA_APP_ID = "extra_app_id"
 +        const val EXTRA_ACTION = "extra_action"
++        const val EXTRA_PAYLOAD = "extra_payload"
 +
 +        val BRIDGES = listOf(
 +            Bridge(
@@ -379,7 +385,7 @@ index be22fb5f..cd8d09be 100644
  
          // Leaving a mode switch waiting on an animation that will never finish would strand the
          // strip on a mode the camera never entered.
-@@ -804,6 +810,97 @@ open class MainActivity : AppCompatActivity(),
+@@ -804,6 +810,132 @@ open class MainActivity : AppCompatActivity(),
          framePrefetchedAt = 0
      }
  
@@ -402,12 +408,27 @@ index be22fb5f..cd8d09be 100644
 +        }
 +    }
 +
++    private fun buildWatchCameraStateJson(): String {
++        val mode = if (camConfig.isVideoMode) "video" else "photo"
++        val facing = if (camConfig.lensFacing == androidx.camera.core.CameraSelector.LENS_FACING_FRONT) "front" else "back"
++        val zoom = camConfig.camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1.0f
++        val torch = camConfig.isTorchOn
++        val recording = this::videoCapturer.isInitialized && videoCapturer.isRecording
++        return org.json.JSONObject()
++            .put("mode", mode)
++            .put("facing", facing)
++            .put("zoom", String.format(java.util.Locale.US, "%.2f", zoom).toDouble())
++            .put("torch", torch)
++            .put("recording", recording)
++            .toString()
++    }
++
 +    private fun startWatchRemote() {
 +        if (!watchRemoteAllowed || !camConfig.watchRemoteEnabled) return
 +        val remote = watchRemote ?: WatchRemote(this, ::handleWatchCommand).also { watchRemote = it }
 +        remote.start()
 +        if (remote.isActive) {
-+            remote.sendStatus(WatchRemote.Status.READY)
++            remote.sendStatus(WatchRemote.Status.READY, buildWatchCameraStateJson())
 +        }
 +    }
 +
@@ -422,7 +443,8 @@ index be22fb5f..cd8d09be 100644
 +    fun sendWatchStatus(status: WatchRemote.Status) {
 +        val remote = watchRemote ?: return
 +        if (remote.isActive) {
-+            remote.sendStatus(status)
++            val state = if (status == WatchRemote.Status.PAUSED) null else buildWatchCameraStateJson()
++            remote.sendStatus(status, state)
 +        }
 +    }
 +
@@ -462,14 +484,33 @@ index be22fb5f..cd8d09be 100644
 +
 +        when (command) {
 +            WatchRemote.Command.CAPTURE -> captureButton.performClick()
-+            WatchRemote.Command.FLIP -> camConfig.toggleCameraSelector()
-+            WatchRemote.Command.ZOOM_IN -> cameraControl.zoomIn()
-+            WatchRemote.Command.ZOOM_OUT -> cameraControl.zoomOut()
-+            WatchRemote.Command.TORCH -> camConfig.toggleTorchState()
-+            WatchRemote.Command.MODE_PHOTO ->
++            WatchRemote.Command.FLIP -> {
++                camConfig.toggleCameraSelector()
++                sendWatchStatus(WatchRemote.Status.STATE_CHANGED)
++            }
++            WatchRemote.Command.ZOOM_IN -> {
++                cameraControl.zoomIn()
++                sendWatchStatus(WatchRemote.Status.STATE_CHANGED)
++            }
++            WatchRemote.Command.ZOOM_OUT -> {
++                cameraControl.zoomOut()
++                sendWatchStatus(WatchRemote.Status.STATE_CHANGED)
++            }
++            WatchRemote.Command.TORCH -> {
++                camConfig.toggleTorchState()
++                sendWatchStatus(WatchRemote.Status.STATE_CHANGED)
++            }
++            WatchRemote.Command.MODE_PHOTO -> {
 +                tabLayout.getTabForMode(CameraMode.CAMERA)?.let { tabLayout.goToTab(it) }
-+            WatchRemote.Command.MODE_VIDEO ->
++                sendWatchStatus(WatchRemote.Status.STATE_CHANGED)
++            }
++            WatchRemote.Command.MODE_VIDEO -> {
 +                tabLayout.getTabForMode(CameraMode.VIDEO)?.let { tabLayout.goToTab(it) }
++                sendWatchStatus(WatchRemote.Status.STATE_CHANGED)
++            }
++            WatchRemote.Command.TIMER_CYCLE -> {
++                sendWatchStatus(WatchRemote.Status.STATE_CHANGED)
++            }
 +            WatchRemote.Command.STATUS_QUERY -> {}
 +        }
 +    }
