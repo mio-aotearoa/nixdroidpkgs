@@ -39,3 +39,13 @@
 - When a dependency update requires a newer version of Gradle or a plugin (like AGP) that our environment might not natively provide out of the box through standard derivations like `gradle_9`, always check if there is a more specific/newer version like `gradle_9_5_1` available in the `libs/gr/` directory (or other selfPackages) and use it. Prefer explicit versions over base versions, and ALWAYS avoid using `substituteInPlace` or `replace-fail` to downgrade Android Gradle Plugin (AGP) or Kotlin versions to older ones just to make them compile with a stale `mitmCache` or `gradle.lock`. Instead, regenerate the lockfile by updating the environment appropriately.
 - If you borrow, port, or adapt source code or algorithms from the internet or open-source projects, always remember to include comments with the original source URL, author/project name, and license reference in the code/patch.
 
+## APK update workflow
+
+This is the workflow for an "apk update" request:
+
+1. `python3 check_updates.py` from the repo root. It only looks at git-based app packages that are not managed by `nvfetcher.toml`/`_sources`; do not bump `nvfetcher` packages for a general apk update.
+2. Review the report. `[DOWNGRADE]` lines are false positives from GitHub's "latest release"/tag ordering and are ignored unless verified otherwise with `git ls-remote --tags <url>`.
+3. For every package with a real update, use its own `passthru.updateScript`: `nix build .#apk_<pkg>.updateScript --no-link --print-out-paths`, then run `<store-path>/bin/update-<pkg>`. Do not hand-edit versions, source hashes, `gradle.lock`, or `*_deps.json` instead of running the script. Packages that track an external SDK pin (e.g. `bitwarden/android`'s `bitwardenSdk` in `gradle/libs.versions.toml`) must bump that pin and its FOD hashes inside the script — a version bump alone leaves the old pin and fails to compile.
+4. If a package that has an update lacks `passthru.updateScript`, add one following the existing scripts (`nix-update --src-only`, then refresh the package's extra fixed-output hashes with `refresh_update_deps`/`refresh_fod_hash`/`refresh_mitm_cache` from `app/apks/_shared/update-script-helpers.sh`, then regenerate the Gradle lock/mitm cache). Expose the needed attributes through `passthru` (e.g. `sdkSrc`, `offlineCache`) so the helper can read their `outputHash`.
+5. When the update scripts are done, `nix build .#fdroid-repo` must pass; it only rebuilds the apps whose derivations changed. Failures there usually mean a stale `mitmCache`/`gradle.lock`/vendored hash for a newly bumped app, not a repo-metadata problem.
+

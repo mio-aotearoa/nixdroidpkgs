@@ -14,6 +14,8 @@
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
+  writeShellScriptBin,
+  nix-update,
 }:
 let
   appPackage =
@@ -40,13 +42,13 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "joplin";
-      version = "3.7.11";
+      version = "3.7.14";
 
       src = fetchFromGitHub {
         owner = "laurent22";
         repo = "joplin";
         tag = "android-v${finalAttrs.version}";
-        hash = "sha256-H7A2T1iu6XPdFK7QfslXdw9lIz7Pkcrt5YNaQ9TxYgY=";
+        hash = "sha256-RwBxf9kiWLKoFkeMFRG+K3X0QRvxzuPC/7x67SiKV+s=";
       };
 
       sourceRoot = "${finalAttrs.src.name}";
@@ -64,7 +66,7 @@ let
           patches
           missingHashes
           ;
-        hash = "sha256-mbscTXEG5QQ1YreK4noq6vy3okKi11QgOyTzyNmZcYM=";
+        hash = "sha256-cvTrj3SUl9V10DUNG5I6ffLZV90qcFO534jJjJauvE4=";
       };
 
       gradleBuildTask = ":app:assembleRelease -x :app:lintVitalAnalyzeRelease -x :app:lintVitalReportRelease -x :app:lintVitalRelease";
@@ -220,6 +222,27 @@ let
           packages/app-mobile/android/app/build/outputs/apk/release/app-release.apk \
           "$out/joplin.apk"
         runHook postInstall
+      '';
+
+      passthru = {
+        # Refreshed by passthru.updateScript alongside the source hash.
+        offlineCache = finalAttrs.offlineCache;
+      };
+
+      passthru.updateScript = writeShellScriptBin "update-joplin" ''
+        set -euo pipefail
+
+        package_file="app/apks/joplin/package.nix"
+        package_attr=".#apk_joplin"
+        fake_hash="${lib.fakeHash}"
+
+        . "${../_shared/update-script-helpers.sh}"
+
+        ${lib.getExe nix-update} --flake --version-regex='^android-v?([0-9]+\.[0-9]+\.[0-9]+)$' --src-only apk_joplin
+
+        # The yarn offline cache is derived from the new source tree.
+        refresh_update_deps offlineCache
+        refresh_mitm_cache
       '';
 
       meta = with lib; {

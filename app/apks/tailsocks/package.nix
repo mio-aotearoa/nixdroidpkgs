@@ -407,37 +407,47 @@ let
 
         refresh_update_deps goModCache
 
-        # refresh_gradle_lock copies the raw source; apply the same git stub
-        # used in preConfigure so Gradle can evaluate outside a git checkout.
+        # refresh_gradle_lock copies the raw source; apply the same edits used in
+        # preConfigure so Gradle can evaluate outside a git checkout and without
+        # trying to install build-tools 35 into the read-only SDK.
         src_for_lock="$(nix build .#apk_tailsocks.src --no-link --print-out-paths)"
         lock_tmp="$(mktemp -d)"
         cp -R "$src_for_lock/." "$lock_tmp/"
         chmod -R u+w "$lock_tmp"
         short_commit="$(sed -n 's/^[[:space:]]*appCommit = "\([^"]*\)";/\1/p' "$package_file" | head -n 1 | cut -c1-6)"
-        # Host updateScripts lack stdenv's substituteInPlace; mirror replace_literal.
-        old_git_stub='commandLine("git", "rev-parse", "--short=6", "HEAD")'
-        new_git_stub="commandLine(\"echo\", \"$short_commit\")"
-        gradle_kts="$lock_tmp/app/build.gradle.kts"
-        grep -F -q "$old_git_stub" "$gradle_kts" || {
-          echo "error: git rev-parse stub site missing in $gradle_kts" >&2
-          exit 1
-        }
-        stub_tmp="$(mktemp "$gradle_kts.XXXXXX")"
-        awk -v old="$old_git_stub" -v new="$new_git_stub" '
-          {
-            rest = $0
-            result = ""
-            while ((i = index(rest, old)) > 0) {
-              result = result substr(rest, 1, i - 1) new
-              rest = substr(rest, i + length(old))
-            }
-            print result rest
+        # Host updateScripts lack stdenv's substituteInPlace; mirror it with awk.
+        replace_in_file() {
+          local file="$1" old="$2" new="$3" tmp
+          grep -F -q "$old" "$file" || {
+            echo "error: replacement site '$old' missing in $file" >&2
+            exit 1
           }
-        ' "$gradle_kts" >"$stub_tmp"
-        mv "$stub_tmp" "$gradle_kts"
+          tmp="$(mktemp "$file.XXXXXX")"
+          awk -v old="$old" -v new="$new" '
+            {
+              rest = $0
+              result = ""
+              while ((i = index(rest, old)) > 0) {
+                result = result substr(rest, 1, i - 1) new
+                rest = substr(rest, i + length(old))
+              }
+              print result rest
+            }
+          ' "$file" >"$tmp"
+          mv "$tmp" "$file"
+        }
+        gradle_kts="$lock_tmp/app/build.gradle.kts"
+        replace_in_file "$gradle_kts" \
+          'commandLine("git", "rev-parse", "--short=6", "HEAD")' \
+          "commandLine(\"echo\", \"$short_commit\")"
+        replace_in_file "$gradle_kts" \
+          '    compileSdk = 37' \
+          '    compileSdk = 37; buildToolsVersion = "36.0.0"'
         nix develop .#apk_tailsocks -c bash -c '
           cd "$1"
-          nix run github:tadfisher/gradle2nix/v2 -- --gradle-wrapper="$2"
+          nix run github:tadfisher/gradle2nix/v2 -- \
+            --gradle-wrapper="$2" \
+            -- -PallowUnsignedRelease
         ' bash "$lock_tmp" ${gradle.version}
         mv "$lock_tmp/gradle.lock" app/apks/tailsocks/gradle.lock
         rm -rf "$lock_tmp"

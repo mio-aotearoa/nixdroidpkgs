@@ -13,6 +13,8 @@
   cargo,
   rustc,
   fetchurl,
+  writeShellScriptBin,
+  nix-update,
 }:
 let
   appPackage =
@@ -29,17 +31,17 @@ let
 
       gradle = gradle_9_7_1;
 
-      # https://github.com/bitwarden/android/blob/v2026.10.1-bwa/gradle/libs.versions.toml#L32 bitwardenSdk = "4.0.0-9318-3b2c8fc3"
+      # https://github.com/bitwarden/android/blob/v2026.11.0-bwa/gradle/libs.versions.toml#L32 bitwardenSdk = "4.0.0-9737-d9119f7a"
       sdkSrc = fetchFromGitHub {
         owner = "bitwarden";
         repo = "sdk-internal";
-        rev = "3b2c8fc3";
-        hash = "sha256-xQG3Dj4lD6P+DwwO4s6ddk+t2vX5+hrusJxLdxpquvg=";
+        rev = "d9119f7a";
+        hash = "sha256-WR86cEuBNap7T+StYmazuvRYMYmReHw/OIdAQ8ahMKw=";
       };
 
       sdkSrcLock = fetchurl {
         url = "${sdkSrc.meta.homepage}/raw/${sdkSrc.rev}/Cargo.lock";
-        hash = "sha256-WeODW/2cqOAFadrbuHxfIyfS5yaz1/ZjQcQpMUXMh6k=";
+        hash = "sha256-nf/hNsoKsZ1LOQhmP4BWNIe+0/2BTd0T49CDHeuEt2k=";
       };
 
       androidCrossConfig = {
@@ -150,7 +152,7 @@ let
           version = "3.0.0";
           src = sdkSrc;
           cargoRoot = ".";
-          hash = "sha256-i7mkRHGn7hB7Nk5ug8v1wk0d5aPyfl0ErbW/IPrPUi0=";
+          hash = "sha256-D9+4oBB19ixLjJBCgDIbWXzxAr0zTTf28gJkOcqNTD8=";
         };
         nativeBuildInputs = [
           rustPlatform.cargoSetupHook
@@ -183,13 +185,13 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "bitwarden-authenticator";
-      version = "2026.10.1";
+      version = "2026.11.0";
 
       src = fetchFromGitHub {
         owner = "bitwarden";
         repo = "android";
         tag = "v${finalAttrs.version}-bwa";
-        hash = "sha256-d/tyRBzcPkYuZm6oO1/kEGKkgRk9DEOUI+76p4Wo0ww=";
+        hash = "sha256-ufibs9f98OR6C3K7Fyc9sOx9YsohiCiiL5tR/32W/qM=";
       };
 
       gradleBuildTask = ":authenticator:assembleRelease";
@@ -443,6 +445,44 @@ let
           authenticator/build/outputs/apk/release/com.bitwarden.authenticator.apk \
           "$out/bitwarden-authenticator.apk"
         runHook postInstall
+      '';
+
+      passthru = {
+        # Refreshed by passthru.updateScript when the sdk-internal pin moves.
+        inherit sdkSrc sdkSrcLock;
+        sdkCargoVendor = sdkGeneratedJava.cargoDeps.vendorStaging;
+      };
+
+      passthru.updateScript = writeShellScriptBin "update-bitwarden-authenticator" ''
+        set -euo pipefail
+
+        package_file="app/apks/bitwarden-authenticator/package.nix"
+        package_attr=".#apk_bitwarden-authenticator"
+        fake_hash="${lib.fakeHash}"
+
+        . "${../_shared/update-script-helpers.sh}"
+
+        ${lib.getExe nix-update} --flake --version-regex='^v?([0-9]+\.[0-9]+\.[0-9]+)-bwa$' --src-only apk_bitwarden-authenticator
+
+        # The app pins a bitwarden/sdk-internal revision through
+        # gradle/libs.versions.toml (bitwardenSdk = "4.0.0-<build>-<rev>").
+        # A version bump usually moves it; a stale pin fails to compile
+        # because the app uses SDK APIs missing from the old revision.
+        src="$(nix build "$package_attr.src" --no-link --print-out-paths)"
+        sdk_spec="$(sed -n 's/^bitwardenSdk *= *"\([^"]*\)".*/\1/p' "$src/gradle/libs.versions.toml" | head -n 1)"
+        if [[ -z "$sdk_spec" ]]; then
+          echo "error: could not read bitwardenSdk from $src/gradle/libs.versions.toml" >&2
+          exit 1
+        fi
+        sdk_rev="''${sdk_spec##*-}"
+        old_rev="$(nix eval --impure --raw "$package_attr.sdkSrc.rev")"
+        if [[ "$sdk_rev" != "$old_rev" ]]; then
+          echo "sdk-internal: $old_rev -> $sdk_rev"
+          replace_literal "rev = \"$old_rev\";" "rev = \"$sdk_rev\";"
+          refresh_update_deps sdkSrc sdkSrcLock sdkCargoVendor
+        fi
+
+        refresh_mitm_cache
       '';
 
       meta = with lib; {
