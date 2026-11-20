@@ -1,10 +1,171 @@
-diff -ruN a/lib/models/app_settings.dart b/lib/models/app_settings.dart
+# Restore upstream MeshCore Open channel auto-resend logic and settings UI
+# (reverts jade-on-mesh/meshcore-open-tak commits 9a93035014 and 3707923da9,
+# adapted from https://github.com/zjs81/meshcore-open, MIT license)
+# and set downstream defaults: enabled by default, 5 retries, max slider 10.
+diff --git a/lib/connector/meshcore_connector.dart b/lib/connector/meshcore_connector.dart
+index 79c7e01..3365daa 100644
+--- a/lib/connector/meshcore_connector.dart
++++ b/lib/connector/meshcore_connector.dart
+@@ -21,6 +21,7 @@ import '../models/otp_sync_status.dart';
+ import '../models/path_selection.dart';
+ import '../models/translation_support.dart';
+ import '../helpers/reaction_helper.dart';
++import '../helpers/channel_resend_coverage.dart';
+ import '../helpers/cyr2lat.dart';
+ import '../helpers/smaz.dart';
+ import '../storage/otp_pad_store.dart';
+@@ -9024,20 +9025,20 @@ class MeshCoreConnector extends ChangeNotifier {
+       channel.index,
+       wireTextForRadio,
+     );
+-    // MeshCore Open TAK: no "resend until heard" (upstream's channel min-hops
+-    // resend): Keymind Cascade repeaters make it unneeded, and its extra
+-    // copies cost airtime. Its settings are kept but no longer shown or read.
+-    Future<void> transmit() => _runScopedChannelSend(() async {
+-      await _waitForRadioQuiet(lastInboundRxTime: _lastChannelMsgRxTime);
+-      await _sendFrameAndWaitForCommandAck(
+-        buildSendChannelTextMsgFrame(
+-          channel.index,
+-          outboundText,
+-          timestamp: message.timestamp.millisecondsSinceEpoch ~/ 1000,
+-        ),
+-        channelSendQueueId: message.messageId,
+-      );
+-    }, region: sendScope);
++    // Resends reuse the timestamp, so they are the same packet: repeaters
++    // that already forwarded it drop the copy and recipients see it once.
++    Future<void> transmit({bool isResend = false}) =>
++        _runScopedChannelSend(() async {
++          await _waitForRadioQuiet(lastInboundRxTime: _lastChannelMsgRxTime);
++          await _sendFrameAndWaitForCommandAck(
++            buildSendChannelTextMsgFrame(
++              channel.index,
++              outboundText,
++              timestamp: message.timestamp.millisecondsSinceEpoch ~/ 1000,
++            ),
++            channelSendQueueId: isResend ? null : message.messageId,
++          );
++        }, region: sendScope);
+     try {
+       await transmit();
+     } catch (_) {
+@@ -9048,6 +9049,92 @@ class MeshCoreConnector extends ChangeNotifier {
+       _markPendingChannelMessageFailedById(message.messageId);
+       rethrow;
+     }
++
++    final settings = _appSettingsService?.settings;
++    if (settings != null && settings.channelMinHopsEnabled) {
++      unawaited(
++        _resendUntilMinHops(
++          message.messageId,
++          () => transmit(isResend: true),
++          minHops: settings.channelMinHops,
++          maxResends: settings.channelMinHopsRetries,
++        ),
++      );
++    }
++  }
++
++  /// How long to listen for a channel message to come back through the mesh
++  /// before resending it.
++  static const Duration _channelHopCheckDelay = Duration(seconds: 30);
++
++  /// Resends a channel message until one of its echoes has travelled through
++  /// at least [minHops] repeaters, then gives up and marks it failed.
++  Future<void> _resendUntilMinHops(
++    String messageId,
++    Future<void> Function() resend, {
++    required int minHops,
++    required int maxResends,
++  }) async {
++    _channelHopChecks[messageId] = (resends: 0, maxResends: maxResends);
++    notifyListeners();
++    var hops = 0;
++    try {
++      for (var attempt = 0; ; attempt++) {
++        await Future<void>.delayed(_channelHopCheckDelay);
++        final message = _findChannelMessageById(messageId);
++        if (message == null) return;
++        if (message.status == ChannelMessageStatus.failed) return;
++        hops = message.pathLength ?? 0;
++        // Read live so toggling the setting mid-resend takes effect.
++        final countRepeaters =
++            _appSettingsService?.settings.channelMinHopsCountRepeaters ?? false;
++        if (channelResendSatisfied(
++          message,
++          minHops: minHops,
++          countDistinctRepeaters: countRepeaters,
++          selfPublicKey: _selfPublicKey,
++        )) {
++          _appDebugLogService?.info(
++            hops >= minHops
++                ? 'Channel message reached $hops hops after $attempt resends'
++                : 'Channel message heard via ${distinctFirstHopRepeaters(message, selfPublicKey: _selfPublicKey).length} '
++                      'first-hop repeaters after $attempt resends',
++            tag: 'Channel resend',
++          );
++          return;
++        }
++        if (attempt >= maxResends || !isConnected) break;
++        _appDebugLogService?.info(
++          'Heard at $hops of $minHops hops; resending '
++          '(${attempt + 1} of $maxResends)',
++          tag: 'Channel resend',
++        );
++        _channelHopChecks[messageId] = (
++          resends: attempt + 1,
++          maxResends: maxResends,
++        );
++        notifyListeners();
++        try {
++          await resend();
++        } catch (e) {
++          _appDebugLogService?.warn(
++            'Channel resend failed: $e',
++            tag: 'Channel resend',
++          );
++          break;
++        }
++      }
++      _appDebugLogService?.warn(
++        'Channel message only heard at $hops of $minHops hops; giving up',
++        tag: 'Channel resend',
++      );
++      // It was sent and may well have travelled further than we can hear, so
++      // this is a warning, not a failure.
++      _channelHopShortfalls[messageId] = (hops: hops, required: minHops);
++    } finally {
++      _channelHopChecks.remove(messageId);
++      notifyListeners();
++    }
+   }
+ 
+   final Map<String, ({int resends, int maxResends})> _channelHopChecks = {};
+@@ -9063,6 +9150,15 @@ class MeshCoreConnector extends ChangeNotifier {
+   ({int resends, int maxResends})? channelResendProgress(String messageId) =>
+       _channelHopChecks[messageId];
+ 
++  ChannelMessage? _findChannelMessageById(String messageId) {
++    for (final messages in _channelMessages.values) {
++      for (int i = messages.length - 1; i >= 0; i--) {
++        if (messages[i].messageId == messageId) return messages[i];
++      }
++    }
++    return null;
++  }
++
+   /// Minimum companion firmware version code whose CMD_SEND_CHANNEL_DATA (62)
+   /// / RESP_CODE_CHANNEL_DATA_RECV (27) layout matches ours (v1.15.0, ver 11).
+   static const int _minFirmwareVerCodeForChannelData = 11;
+diff --git a/lib/models/app_settings.dart b/lib/models/app_settings.dart
+index b46f4f1..be31bd6 100644
 --- a/lib/models/app_settings.dart
 +++ b/lib/models/app_settings.dart
-@@ -281,9 +281,9 @@
-     this.routeWeightSuccessIncrement = 0.5,
-     this.routeWeightFailureDecrement = 0.2,
-     this.maxMessageRetries = 5,
+@@ -351,9 +351,9 @@ class AppSettings {
+     this.routeWeightSuccessIncrement = defaultRouteWeightSuccessIncrement,
+     this.routeWeightFailureDecrement = defaultRouteWeightFailureDecrement,
+     this.maxMessageRetries = defaultMaxMessageRetries,
 -    this.channelMinHopsEnabled = false,
 +    this.channelMinHopsEnabled = true,
      this.channelMinHops = 2,
@@ -12,11 +173,11 @@ diff -ruN a/lib/models/app_settings.dart b/lib/models/app_settings.dart
 +    this.channelMinHopsRetries = 5,
      this.channelMinHopsCountRepeaters = false,
      this.themeMode = 'system',
-     this.customThemes = const [],
-@@ -519,9 +519,9 @@
-       routeWeightFailureDecrement:
-           (json['route_weight_failure_decrement'] as num?)?.toDouble() ?? 0.2,
-       maxMessageRetries: json['max_message_retries'] as int? ?? 5,
+     this.redLight = false,
+@@ -648,9 +648,9 @@ class AppSettings {
+           defaultRouteWeightFailureDecrement,
+       maxMessageRetries:
+           json['max_message_retries'] as int? ?? defaultMaxMessageRetries,
 -      channelMinHopsEnabled: json['channel_min_hops_enabled'] as bool? ?? false,
 +      channelMinHopsEnabled: json['channel_min_hops_enabled'] as bool? ?? true,
        channelMinHops: json['channel_min_hops'] as int? ?? 2,
@@ -25,17 +186,98 @@ diff -ruN a/lib/models/app_settings.dart b/lib/models/app_settings.dart
        channelMinHopsCountRepeaters:
            json['channel_min_hops_count_repeaters'] as bool? ?? false,
        themeMode: json['theme_mode'] as String? ?? 'system',
-diff -ruN a/lib/screens/app_settings_screen.dart b/lib/screens/app_settings_screen.dart
+diff --git a/lib/screens/app_settings_screen.dart b/lib/screens/app_settings_screen.dart
+index ab27765..6949509 100644
 --- a/lib/screens/app_settings_screen.dart
 +++ b/lib/screens/app_settings_screen.dart
-@@ -704,8 +704,8 @@
-             subtitle: Slider(
-               value: settingsService.settings.channelMinHopsRetries.toDouble(),
-               min: 1,
--              max: 5,
--              divisions: 4,
+@@ -706,6 +706,67 @@ class AppSettingsScreen extends StatelessWidget {
+                 )
+               : const SizedBox.shrink(),
+         ),
++        const Divider(height: 1, indent: 16),
++        SwitchListTile(
++          contentPadding: const EdgeInsets.symmetric(
++            horizontal: 16,
++            vertical: 4,
++          ),
++          secondary: const Icon(Icons.cell_tower, size: 24),
++          title: Text(context.l10n.appSettings_channelMinHops),
++          subtitle: Text(context.l10n.appSettings_channelMinHopsSubtitle),
++          value: settingsService.settings.channelMinHopsEnabled,
++          onChanged: settingsService.setChannelMinHopsEnabled,
++        ),
++        if (settingsService.settings.channelMinHopsEnabled) ...[
++          ListTile(
++            title: Text(
++              context.l10n.appSettings_channelMinHopsCount(
++                settingsService.settings.channelMinHops,
++              ),
++            ),
++            subtitle: Slider(
++              value: settingsService.settings.channelMinHops.toDouble(),
++              min: 1,
++              max: 8,
++              divisions: 7,
++              label: settingsService.settings.channelMinHops.toString(),
++              onChanged: (value) =>
++                  settingsService.setChannelMinHops(value.toInt()),
++            ),
++          ),
++          ListTile(
++            title: Text(
++              context.l10n.appSettings_channelMinHopsRetries(
++                settingsService.settings.channelMinHopsRetries,
++              ),
++            ),
++            subtitle: Slider(
++              value: settingsService.settings.channelMinHopsRetries.toDouble(),
++              min: 1,
 +              max: 10,
 +              divisions: 9,
-               label: settingsService.settings.channelMinHopsRetries.toString(),
-               onChanged: (value) =>
-                   settingsService.setChannelMinHopsRetries(value.toInt()),
++              label: settingsService.settings.channelMinHopsRetries.toString(),
++              onChanged: (value) =>
++                  settingsService.setChannelMinHopsRetries(value.toInt()),
++            ),
++          ),
++          SwitchListTile(
++            contentPadding: const EdgeInsets.symmetric(
++              horizontal: 16,
++              vertical: 4,
++            ),
++            secondary: const Icon(Icons.hub_outlined, size: 24),
++            title: Text(context.l10n.appSettings_channelMinHopsCountRepeaters),
++            subtitle: Text(
++              context.l10n.appSettings_channelMinHopsCountRepeatersSubtitle(
++                settingsService.settings.channelMinHops,
++              ),
++            ),
++            value: settingsService.settings.channelMinHopsCountRepeaters,
++            onChanged: settingsService.setChannelMinHopsCountRepeaters,
++          ),
++        ],
+       ],
+     );
+   }
+diff --git a/lib/services/app_settings_service.dart b/lib/services/app_settings_service.dart
+index 5d6800a..4c7ab2d 100644
+--- a/lib/services/app_settings_service.dart
++++ b/lib/services/app_settings_service.dart
+@@ -68,18 +68,6 @@ class AppSettingsService extends ChangeNotifier {
+     }
+     _syncDateTimer();
+     unawaited(ScreenAwakeService.instance.apply(_settings.keepScreenOn));
+-    // MeshCore Open TAK: "Resend channel messages until they travel far
+-    // enough" is gone (Keymind Cascade makes it unneeded); a phone that had
+-    // it on is switched off on its first start after updating.
+-    if (_settings.channelMinHopsEnabled ||
+-        _settings.channelMinHopsCountRepeaters) {
+-      await updateSettings(
+-        _settings.copyWith(
+-          channelMinHopsEnabled: false,
+-          channelMinHopsCountRepeaters: false,
+-        ),
+-      );
+-    }
+   }
+ 
+   Future<void> updateSettings(AppSettings newSettings) async {

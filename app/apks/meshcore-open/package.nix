@@ -161,7 +161,10 @@ let
 
       src = meshcoreSource;
 
-      # The TAK fork already removes the node banner and channel resend UI.
+      # The TAK fork already removes the node banner.
+      patches = [
+        ./resend-channel-messages.patch
+      ];
 
       pubspecLock = lib.importJSON ./pubspec.lock.json;
 
