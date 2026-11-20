@@ -1,4 +1,4 @@
-# repo
+# nixdroidpkgs
 
 I want the following freedom on my devices: `The freedom to study how the program works, and change it so it does your computing as you wish (freedom 1). Access to the source code is a precondition for this.` F-Droid does not help. I need to build apps myself. I cannot figure out how to set up a fdroid build server properly to re-use their build scripts without errors, and I want more repeatable results, so I now have my nix build scripts.
 
