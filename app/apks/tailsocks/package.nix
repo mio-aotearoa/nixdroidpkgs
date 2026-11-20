@@ -38,22 +38,22 @@ let
 
   gradle = gradle_9_2_1;
 
-  version = "6.1.0";
+  version = "6.2.0";
   src = fetchFromGitHub {
     owner = "bropines";
     repo = "tailsocks";
     name = "tailsocks-${version}-source";
     tag = "v${version}";
-    hash = "sha256-pYpMgm7sGI+YmyZETagyX5grUGedQbQ3trUK31TLRU4=";
+    hash = "sha256-UfxaRuIulfkMpPtXaVMQ1iGu/uGqtb7xnb9QxLSRBN4=";
   };
 
   tailscaleVersion = "1.104.5";
   # git rev-parse v1.104.5^{}
   tailscaleCommit = "73a48057aaf5f60e4f770b398e9b7af576b01dbe";
   # git rev-parse v6.1.0^{}
-  appCommit = "36c7545dc10d3c750503408f3ebb3b1c560941ad";
+  appCommit = "22b10b7a501e69fbf4ecd8f13235d5239b1eaeb2";
   # TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d_%H%M%S v6.1.0^{}
-  appCommitTime = "20261114_063027";
+  appCommitTime = "20261119_074108";
 
   tailscaleSrc = fetchFromGitHub {
     owner = "tailscale";

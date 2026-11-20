@@ -69,8 +69,8 @@ let
         owner = "jade-on-mesh";
         repo = "meshcore-open-tak";
         # latest-build is a moving tag; pin the release commit for reproducibility.
-        rev = "4ef7bac568ab040f15e5d3d9cb715b09d67c7fa6";
-        hash = "sha256-Y6wxlgvQDQvnd9nxTKmocQUnILGYg6O1sJ+oeBfdnYM=";
+        rev = "db154435c3a5dc69a088d3fd94e9925c836dcaec";
+        hash = "sha256-eHwSPBMAzJY/l+ju9dRUkljPGNB3j+n9k9IVtYVxTJI=";
       };
 
       androidSdk = androidSdkBuilder (s: [
@@ -154,7 +154,7 @@ let
     in
     buildDartApplication.override { dart = flutter347; } (finalAttrs: {
       pname = "meshcore-open";
-      version = "99.0.3+1356";
+      version = "99.0.3+1363";
 
       __darwinAllowLocalNetworking = true;
       __noChroot = stdenv.hostPlatform.isDarwin;

@@ -185,13 +185,13 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "bitwarden-android";
-      version = "2026.11.0";
+      version = "2026.11.1";
 
       src = fetchFromGitHub {
         owner = "bitwarden";
         repo = "android";
         tag = "v${finalAttrs.version}-bwpm";
-        hash = "sha256-+oxPwjA01+EkUNIRlMf3qi9LqrHSeOzKg/rJ2oYkL+c=";
+        hash = "sha256-ufibs9f98OR6C3K7Fyc9sOx9YsohiCiiL5tR/32W/qM=";
       };
 
       gradleBuildTask = ":app:assembleFdroidRelease";
