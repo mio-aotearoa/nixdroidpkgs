@@ -88,19 +88,16 @@ let
       ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = "${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2";
     };
 
-    prePatch =
-      (agp-resolution.patchSettingsGradle {
+    prePatch = (
+      agp-resolution.patchSettingsGradle {
         file = "settings.gradle.kts";
-        agpVersion = "9.3.2";
+        agpVersion = "9.5.1";
         pluginIds = [
           "com.android.application"
           "com.android.library"
         ];
-      })
-      + ''
-        substituteInPlace gradle/libs.versions.toml \
-          --replace-fail "agp = \"9.4.0\"" "agp = \"9.3.2\""
-      '';
+      }
+    );
 
     postPatch = ''
       echo "android.suppressUnsupportedCompileSdk=37.2" >> gradle.properties

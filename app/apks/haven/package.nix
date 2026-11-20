@@ -114,6 +114,9 @@ let
 
           CARGO_BUILD_TARGET = rustTarget;
           doCheck = false;
+          # nixpkgs defaults to forcing system libs (AWS_LC_SYS_USE_SYSTEM etc.),
+          # which cannot be satisfied when cross-compiling for Android.
+          dontCargoUseSystemLibs = true;
 
           env = {
             ANDROID_HOME = androidSdkRoot;
@@ -168,6 +171,9 @@ let
 
           CARGO_BUILD_TARGET = rustTarget;
           doCheck = false;
+          # nixpkgs defaults to forcing system libs (AWS_LC_SYS_USE_SYSTEM etc.),
+          # which cannot be satisfied when cross-compiling for Android.
+          dontCargoUseSystemLibs = true;
 
           env = {
             ANDROID_HOME = androidSdkRoot;

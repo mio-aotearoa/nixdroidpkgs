@@ -2719,6 +2719,16 @@
       "hash": "sha256-lwtwy3WhhGObb7m6PEZaympOGl8//01lzoV0sv157zg="
     }
   },
+  "org.bouncycastle:bcprov-jdk18on:1.87": {
+    "bcprov-jdk18on-1.87.jar": {
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk18on/1.87/bcprov-jdk18on-1.87.jar",
+      "hash": "sha256-EtLT3YKp7BXpLsfHlD7mT2CXxtwSwH6YTxaTt3Vluao="
+    },
+    "bcprov-jdk18on-1.87.pom": {
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk18on/1.87/bcprov-jdk18on-1.87.pom",
+      "hash": "sha256-X0esrJgIzgkicyPFH7DSMBsamFv7j7ju/f08DdmCWgw="
+    }
+  },
   "org.bouncycastle:bcprov-jdk18on:1.80.2": {
     "bcprov-jdk18on-1.80.2.jar": {
       "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk18on/1.80.2/bcprov-jdk18on-1.80.2.jar",

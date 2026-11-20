@@ -97,6 +97,9 @@ let
           };
 
           doCheck = false;
+          # nixpkgs defaults to forcing system libs (AWS_LC_SYS_USE_SYSTEM etc.),
+          # which cannot be satisfied when cross-compiling for Android.
+          dontCargoUseSystemLibs = true;
           cargoBuildFlags = [ "-p bitwarden-uniffi" ];
           CARGO_BUILD_TARGET = rustTarget;
           preBuild = ''

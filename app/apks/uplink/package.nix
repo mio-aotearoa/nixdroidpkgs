@@ -60,6 +60,9 @@ let
         cargoLock.lockFile = "${uplinkSrc}/Cargo.lock";
         buildAndTestSubdir = "native/hub";
         doCheck = false;
+        # nixpkgs defaults to forcing system libs (AWS_LC_SYS_USE_SYSTEM etc.),
+        # which cannot be satisfied when cross-compiling for Android.
+        dontCargoUseSystemLibs = true;
       };
     in
     buildDartApplication.override { dart = flutter344; } (finalAttrs: {
