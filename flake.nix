@@ -52,13 +52,15 @@
       url = "github:NixOS/flake-compat";
       flake = false;
     };
-    openwrt-imagebuilder = {
-      url = "github:astro/nix-openwrt-imagebuilder";
-      #url = "github:mio-19/nix-openwrt-imagebuilder";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-parts.follows = "flake-parts";
-      inputs.systems.follows = "flake-utils/systems";
-    };
+    /*
+      openwrt-imagebuilder = {
+        url = "github:astro/nix-openwrt-imagebuilder";
+        #url = "github:mio-19/nix-openwrt-imagebuilder";
+        inputs.nixpkgs.follows = "nixpkgs";
+        inputs.flake-parts.follows = "flake-parts";
+        inputs.systems.follows = "flake-utils/systems";
+      };
+    */
     gradle2nix = {
       url = "github:tadfisher/gradle2nix/v2";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -96,7 +98,7 @@
       ];
       imports = [
         inputs.nix-kernelsu-builder.flakeModules.default
-        ./openwrt.nix
+        #./openwrt.nix
         ./robotnix.nix
         ./app
         ./mc
