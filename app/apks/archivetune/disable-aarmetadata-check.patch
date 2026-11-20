@@ -1,8 +1,10 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 268dfb7..b604e52 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
-@@ -192,3 +192,9 @@
-     implementation(libs.tink.android)
-     implementation(libs.unison)
+@@ -495,3 +495,9 @@ configurations.configureEach {
+         "org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlinMetadata.get()}",
+     )
  }
 +
 +tasks.configureEach {

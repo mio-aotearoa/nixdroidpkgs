@@ -1040,6 +1040,14 @@
   "com/android/application#com.android.application.gradle.plugin/9.5.0": {
    "pom": "sha256-eKiyYausmhahI+QNdHhH2vGCZHk5RE7Tda9AcmvD4+k="
   },
+  "com/android/compose/screenshot#com.android.compose.screenshot.gradle.plugin/0.0.1-alpha16": {
+   "pom": "sha256-RU+snCNUTXZOEWZ5z4u3nsWQat5SX0IGE4vK/SWJuKI="
+  },
+  "com/android/compose/screenshot#screenshot-test-gradle-plugin/0.0.1-alpha16": {
+   "jar": "sha256-at/lw7jEdn6OHIJjpjOLVmiMPVIaRlP6a6kqgaXsb9M=",
+   "module": "sha256-AH3C+kSTRs2yZdmdDvPT1o4ofD+ptp4nup/l6zd89SA=",
+   "pom": "sha256-7iCIPCx7AlDjiTYR8lxTv+oouz/aF/G+jEKQtz0XOIM="
+  },
   "com/android/databinding#baseLibrary/9.5.0": {
    "jar": "sha256-lroqXwAIRtMXrN2Q3mp0KXAaxWVz3izMhCPSukBEb9k=",
    "pom": "sha256-Rp9E3PYJCx0/OeZtbgpYcenYA+XQDMTLgHoMmqzEgYI="

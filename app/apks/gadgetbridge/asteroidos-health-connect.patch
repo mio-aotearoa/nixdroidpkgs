@@ -1,0 +1,358 @@
+diff --git a/GBDaoGenerator/src/nodomain/freeyourgadget/gadgetbridge/daogen/GBDaoGenerator.java b/GBDaoGenerator/src/nodomain/freeyourgadget/gadgetbridge/daogen/GBDaoGenerator.java
+index 29fc577..a28b368 100644
+--- a/GBDaoGenerator/src/nodomain/freeyourgadget/gadgetbridge/daogen/GBDaoGenerator.java
++++ b/GBDaoGenerator/src/nodomain/freeyourgadget/gadgetbridge/daogen/GBDaoGenerator.java
+@@ -111,7 +111,7 @@ public class GBDaoGenerator {
+             outputDir.mkdirs();
+         }
+ 
+-        final Schema schema = new Schema(160, MAIN_PACKAGE + ".entities");
++        final Schema schema = new Schema(161, MAIN_PACKAGE + ".entities");
+ 
+         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
+         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
+@@ -187,6 +187,7 @@ public class GBDaoGenerator {
+         addFitProActivitySample(schema, user, device);
+         addLaxasFitActivitySample(schema, user, device);
+         addPineTimeActivitySample(schema, user, device);
++        addAsteroidOSActivitySample(schema, user, device);
+         addPolarH10ActivitySample(schema, user, device);
+         addWithingsSteelHRActivitySample(schema, user, device);
+         addGenericBloodPressureSample(schema, user, device);
+@@ -2238,6 +2239,16 @@ public class GBDaoGenerator {
+         return activitySample;
+     }
+ 
++    private static Entity addAsteroidOSActivitySample(Schema schema, Entity user, Entity device) {
++        Entity activitySample = addEntity(schema, "AsteroidOSActivitySample");
++        activitySample.implementsSerializable();
++        addCommonActivitySampleProperties("AbstractActivitySample", activitySample, user, device);
++        activitySample.addIntProperty(SAMPLE_RAW_KIND).notNull().codeBeforeGetterAndSetter(OVERRIDE);
++        activitySample.addIntProperty(SAMPLE_STEPS).notNull().codeBeforeGetterAndSetter(OVERRIDE);
++        addHeartRateProperties(activitySample);
++        return activitySample;
++    }
++
+     private static Entity addPolarH10ActivitySample(Schema schema, Entity user, Entity device) {
+         Entity sample = addEntity(schema, "PolarH10ActivitySample");
+         sample.implementsSerializable();
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/database/schema/GadgetbridgeUpdate_160.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/database/schema/GadgetbridgeUpdate_160.java
+new file mode 100644
+index 0000000..fd9818e
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/database/schema/GadgetbridgeUpdate_160.java
+@@ -0,0 +1,25 @@
++/*  Copyright (C) 2026 AsteroidOS / Matawaa
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version. */
++package nodomain.freeyourgadget.gadgetbridge.database.schema;
++
++import android.database.sqlite.SQLiteDatabase;
++
++import nodomain.freeyourgadget.gadgetbridge.database.DBUpdateScript;
++import nodomain.freeyourgadget.gadgetbridge.entities.AsteroidOSActivitySampleDao;
++
++public class GadgetbridgeUpdate_160 implements DBUpdateScript {
++    @Override
++    public void upgradeSchema(final SQLiteDatabase db) {
++        AsteroidOSActivitySampleDao.createTable(db, true);
++    }
++
++    @Override
++    public void downgradeSchema(final SQLiteDatabase db) {
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSDeviceCoordinator.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSDeviceCoordinator.java
+index 63b3767..668ef9a 100644
+--- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSDeviceCoordinator.java
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSDeviceCoordinator.java
+@@ -21,6 +21,7 @@ import android.bluetooth.le.ScanFilter;
+ import android.os.ParcelUuid;
+ 
+ import androidx.annotation.NonNull;
++import androidx.annotation.Nullable;
+ 
+ import java.util.ArrayList;
+ import java.util.Collection;
+@@ -28,8 +29,11 @@ import java.util.List;
+ 
+ import nodomain.freeyourgadget.gadgetbridge.R;
+ import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+ import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
++import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
+ import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
+ import nodomain.freeyourgadget.gadgetbridge.service.devices.asteroidos.AsteroidOSDeviceSupport;
+ 
+@@ -90,6 +94,42 @@ public class AsteroidOSDeviceCoordinator extends AbstractBLEDeviceCoordinator {
+     @Override
+     public boolean supportsScreenshots(GBDevice device) { return true; }
+ 
++    @Override
++    public boolean supportsActivityTracking(@NonNull GBDevice device) {
++        return true;
++    }
++
++    @Override
++    public boolean supportsStepCounter(@NonNull GBDevice device) {
++        return true;
++    }
++
++    @Override
++    public boolean supportsHeartRateMeasurement(@NonNull GBDevice device) {
++        return true;
++    }
++
++    @Override
++    public boolean supportsSleepMeasurement(@NonNull GBDevice device) {
++        return true;
++    }
++
++    @Override
++    public boolean supportsRemSleep(@NonNull GBDevice device) {
++        return true;
++    }
++
++    @Override
++    public boolean supportsAwakeSleep(@NonNull GBDevice device) {
++        return true;
++    }
++
++    @Nullable
++    @Override
++    public SampleProvider<? extends ActivitySample> getSampleProvider(@NonNull GBDevice device, @NonNull DaoSession session) {
++        return new AsteroidOSSampleProvider(device, session);
++    }
++
+     @NonNull
+     @Override
+     public DeviceSupport createDeviceSupport(final GBDevice device) {
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSSampleProvider.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSSampleProvider.java
+new file mode 100644
+index 0000000..1b25c12
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSSampleProvider.java
+@@ -0,0 +1,99 @@
++/*  Copyright (C) 2026 AsteroidOS / Matawaa
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version. */
++package nodomain.freeyourgadget.gadgetbridge.devices.asteroidos;
++
++import androidx.annotation.NonNull;
++import androidx.annotation.Nullable;
++
++import java.util.List;
++
++import de.greenrobot.dao.AbstractDao;
++import de.greenrobot.dao.Property;
++import nodomain.freeyourgadget.gadgetbridge.devices.AbstractSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.AsteroidOSActivitySample;
++import nodomain.freeyourgadget.gadgetbridge.entities.AsteroidOSActivitySampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
++
++public class AsteroidOSSampleProvider extends AbstractSampleProvider<AsteroidOSActivitySample> {
++    public AsteroidOSSampleProvider(GBDevice device, DaoSession session) {
++        super(device, session);
++    }
++
++    @Override
++    public AbstractDao<AsteroidOSActivitySample, ?> getSampleDao() {
++        return getSession().getAsteroidOSActivitySampleDao();
++    }
++
++    @Nullable
++    @Override
++    protected Property getRawKindSampleProperty() {
++        return AsteroidOSActivitySampleDao.Properties.RawKind;
++    }
++
++    @NonNull
++    @Override
++    protected Property getTimestampSampleProperty() {
++        return AsteroidOSActivitySampleDao.Properties.Timestamp;
++    }
++
++    @NonNull
++    @Override
++    protected Property getDeviceIdentifierSampleProperty() {
++        return AsteroidOSActivitySampleDao.Properties.DeviceId;
++    }
++
++    @Override
++    public ActivityKind normalizeType(int rawType) {
++        return ActivityKind.fromCode(rawType);
++    }
++
++    @Override
++    public int toRawActivityKind(ActivityKind activityKind) {
++        return activityKind.getCode();
++    }
++
++    @Override
++    public float normalizeIntensity(int rawIntensity) {
++        return 0.0f;
++    }
++
++    @Override
++    public AsteroidOSActivitySample createActivitySample() {
++        return new AsteroidOSActivitySample();
++    }
++
++    public void upsertSample(final AsteroidOSActivitySample sample) {
++        final List<AsteroidOSActivitySample> nearSamples = getGBActivitySamples(
++                sample.getTimestamp() - 60,
++                sample.getTimestamp() + 60
++        );
++        if (nearSamples.isEmpty()) {
++            addGBActivitySample(sample);
++            return;
++        }
++        AsteroidOSActivitySample nearest = nearSamples.get(0);
++        for (final AsteroidOSActivitySample s : nearSamples) {
++            if (Math.abs(sample.getTimestamp() - s.getTimestamp()) < Math.abs(sample.getTimestamp() - nearest.getTimestamp())) {
++                nearest = s;
++            }
++        }
++        if (sample.getHeartRate() > 0) {
++            nearest.setHeartRate(sample.getHeartRate());
++        }
++        if (sample.getSteps() > 0) {
++            nearest.setSteps(sample.getSteps());
++        }
++        if (sample.getRawKind() != ActivityKind.UNKNOWN.getCode()) {
++            nearest.setRawKind(sample.getRawKind());
++        }
++        addGBActivitySample(nearest);
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
+index 84cdaf2..e402621 100644
+--- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
+@@ -61,6 +61,13 @@ import org.json.JSONException;
+ import org.json.JSONObject;
+ 
+ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
++import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
++import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
++import nodomain.freeyourgadget.gadgetbridge.devices.asteroidos.AsteroidOSSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.AsteroidOSActivitySample;
++import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
++import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
++import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
+ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
+@@ -757,6 +764,9 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
+         }
+         if (msgType == AB_MSG_DATA_PUT) {
+             getDataLayerPrefs().edit().putString(appId + "|" + path, payload).apply();
++            if ("org.asteroidos.health".equals(appId) && "/summary/today".equals(path)) {
++                ingestAsteroidHealthSummary(payload);
++            }
+             broadcastAppBridge(msgType, appId, path, payload, null);
+             return;
+         }
+@@ -872,6 +882,88 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
+         builder.queue();
+     }
+ 
++    private void ingestAsteroidHealthSummary(String payload) {
++        try {
++            final JSONObject obj = new JSONObject(payload);
++            final int fallbackTs = obj.optInt("updated", (int) (System.currentTimeMillis() / 1000L));
++            int hrTs = fallbackTs;
++            int hrBpm = 0;
++            final String latestHr = obj.optString("latestHr", "");
++            if (!latestHr.isEmpty()) {
++                final String[] p = latestHr.split(":");
++                if (p.length >= 2) {
++                    hrTs = Integer.parseInt(p[0]);
++                    hrBpm = Integer.parseInt(p[1]);
++                }
++            }
++
++            int stepsTs = fallbackTs;
++            int stepsVal = 0;
++            final String latestSteps = obj.optString("latestSteps", "");
++            if (!latestSteps.isEmpty()) {
++                final String[] p = latestSteps.split(":");
++                if (p.length >= 2) {
++                    stepsTs = Integer.parseInt(p[0]);
++                    stepsVal = Integer.parseInt(p[1]);
++                }
++            }
++
++            int sleepTs = fallbackTs;
++            int sleepStage = -1;
++            int sleepBpm = 0;
++            final String latestSleep = obj.optString("latestSleep", "");
++            if (!latestSleep.isEmpty()) {
++                final String[] p = latestSleep.split(":");
++                if (p.length >= 2) {
++                    sleepTs = Integer.parseInt(p[0]);
++                    sleepStage = Integer.parseInt(p[1]);
++                    if (p.length >= 4) {
++                        sleepBpm = Integer.parseInt(p[3]);
++                    }
++                }
++            }
++
++            final int sampleTs = Math.max(fallbackTs, Math.max(hrTs, Math.max(stepsTs, sleepTs)));
++            final int bpm = sleepBpm > 0 ? sleepBpm : hrBpm;
++            final ActivityKind kind;
++            switch (sleepStage) {
++                case 0:
++                    kind = ActivityKind.AWAKE_SLEEP;
++                    break;
++                case 1:
++                    kind = ActivityKind.LIGHT_SLEEP;
++                    break;
++                case 2:
++                    kind = ActivityKind.DEEP_SLEEP;
++                    break;
++                case 3:
++                    kind = ActivityKind.REM_SLEEP;
++                    break;
++                default:
++                    kind = stepsVal > 0 ? ActivityKind.ACTIVITY : ActivityKind.UNKNOWN;
++                    break;
++            }
++
++            try (DBHandler dbHandler = GBApplication.acquireDB()) {
++                final AsteroidOSSampleProvider provider = new AsteroidOSSampleProvider(getDevice(), dbHandler.getDaoSession());
++                final AsteroidOSActivitySample sample = provider.createActivitySample();
++                sample.setDevice(DBHelper.getDevice(getDevice(), dbHandler.getDaoSession()));
++                sample.setUser(DBHelper.getUser(dbHandler.getDaoSession()));
++                sample.setTimestamp(sampleTs);
++                sample.setRawKind(kind.getCode());
++                sample.setSteps(Math.max(0, stepsVal));
++                sample.setHeartRate(bpm > 0 ? bpm : ActivitySample.NOT_MEASURED);
++                provider.upsertSample(sample);
++            }
++
++            final Intent intent = new Intent(GBApplication.ACTION_NEW_DATA)
++                    .putExtra(GBDevice.EXTRA_DEVICE, getDevice());
++            LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent);
++        } catch (Exception e) {
++            LOG.warn("AsteroidOS: failed to ingest health summary", e);
++        }
++    }
++
+     /**
+      * Handles a media command sent from the AsteroidOS device
+      * @param characteristic The Characteristic information

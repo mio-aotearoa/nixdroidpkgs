@@ -1,8 +1,26 @@
 diff --git a/app/src/main/kotlin/moe/rukamori/archivetune/MainActivity.kt b/app/src/main/kotlin/moe/rukamori/archivetune/MainActivity.kt
-index f227908..2e3efc1 100644
+index f227908..7a82dbb 100644
 --- a/app/src/main/kotlin/moe/rukamori/archivetune/MainActivity.kt
 +++ b/app/src/main/kotlin/moe/rukamori/archivetune/MainActivity.kt
-@@ -289,7 +289,6 @@ import moe.rukamori.archivetune.ui.component.IconButton
+@@ -223,9 +223,7 @@ import moe.rukamori.archivetune.constants.DisableScreenshotKey
+ import moe.rukamori.archivetune.constants.DynamicThemeKey
+ import moe.rukamori.archivetune.constants.EnableHapticFeedbackKey
+ import moe.rukamori.archivetune.constants.FontPreferenceKey
+-import moe.rukamori.archivetune.constants.HasPressedStarKey
+ import moe.rukamori.archivetune.constants.AodModeEnabledKey
+-import moe.rukamori.archivetune.constants.LaunchCountKey
+ import moe.rukamori.archivetune.constants.MiniPlayerBottomSpacing
+ import moe.rukamori.archivetune.constants.MiniPlayerHeight
+ import moe.rukamori.archivetune.constants.MiniPlayerLastAnchorKey
+@@ -243,7 +241,6 @@ import moe.rukamori.archivetune.constants.PlayerBackgroundStyleKey
+ import moe.rukamori.archivetune.constants.PlayerDesignStyle
+ import moe.rukamori.archivetune.constants.PlayerDesignStyleKey
+ import moe.rukamori.archivetune.constants.PureBlackKey
+-import moe.rukamori.archivetune.constants.RemindAfterKey
+ import moe.rukamori.archivetune.constants.SYSTEM_DEFAULT
+ import moe.rukamori.archivetune.constants.SearchSource
+ import moe.rukamori.archivetune.constants.SearchSourceKey
+@@ -289,7 +286,6 @@ import moe.rukamori.archivetune.ui.component.IconButton
  import moe.rukamori.archivetune.ui.component.LocalBottomSheetPageState
  import moe.rukamori.archivetune.ui.component.LocalMenuState
  import moe.rukamori.archivetune.ui.component.NetworkStatusBanner
@@ -10,10 +28,56 @@ index f227908..2e3efc1 100644
  import moe.rukamori.archivetune.ui.component.TopAppBarOverflowMenu
  import moe.rukamori.archivetune.ui.component.TopSearch
  import moe.rukamori.archivetune.ui.component.TvNavigationRail
-@@ -1673,44 +1672,6 @@ class MainActivity : ComponentActivity() {
-                         starPromptPending = shouldShow
+@@ -1606,8 +1602,6 @@ class MainActivity : ComponentActivity() {
+                         }
                      }
  
+-                    var showStarDialog by remember { mutableStateOf(false) }
+-                    var starPromptPending by remember { mutableStateOf(false) }
+                     var whatsNewPresented by remember { mutableStateOf(false) }
+                     val whatsNewPending = whatsNewState is WhatsNewState.Checking || whatsNewState is WhatsNewState.Showing
+                     val blockingStartupModal =
+@@ -1615,7 +1609,7 @@ class MainActivity : ComponentActivity() {
+                             menuState.isVisible || menuState.dialogContent != null || bottomSheetPageState.isVisible ||
+                             playerBottomSheetState.isExpandedOrExpanding || active || homeOverflowMenuExpanded || topAppBarOverflowExpanded
+                     val canPresentStartupPrompt =
+-                        LocalWindowInfo.current.isWindowFocused && !blockingStartupModal && !showStarDialog && !isAppUpdateScreen
++                        LocalWindowInfo.current.isWindowFocused && !blockingStartupModal && !isAppUpdateScreen
+ 
+                     LaunchedEffect(whatsNewState is WhatsNewState.Showing, canPresentStartupPrompt) {
+                         if (whatsNewState !is WhatsNewState.Showing) {
+@@ -1645,72 +1639,6 @@ class MainActivity : ComponentActivity() {
+                             }
+                         }
+                     }
+-                    LaunchedEffect(starPromptPending, pendingUpdateVersion, whatsNewPending, canPresentStartupPrompt) {
+-                        if (starPromptPending && pendingUpdateVersion == null && !whatsNewPending && canPresentStartupPrompt) {
+-                            starPromptPending = false
+-                            showStarDialog = true
+-                        }
+-                    }
+-
+-                    LaunchedEffect(Unit) {
+-                        kotlinx.coroutines.delay(3000)
+-
+-                        withContext(Dispatchers.IO) {
+-                            val current = dataStore[LaunchCountKey] ?: 0
+-                            val newCount = current + 1
+-                            dataStore.edit { prefs ->
+-                                prefs[LaunchCountKey] = newCount
+-                            }
+-                        }
+-
+-                        val shouldShow =
+-                            withContext(Dispatchers.IO) {
+-                                val hasPressed = dataStore[HasPressedStarKey] ?: false
+-                                val remindAfter = dataStore[RemindAfterKey] ?: 3
+-                                !hasPressed && (dataStore[LaunchCountKey] ?: 0) >= remindAfter
+-                            }
+-
+-                        starPromptPending = shouldShow
+-                    }
+-
 -                    if (showStarDialog) {
 -                        StarDialog(
 -                            onDismissRequest = { showStarDialog = false },

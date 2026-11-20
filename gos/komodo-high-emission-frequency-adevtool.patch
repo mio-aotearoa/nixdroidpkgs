@@ -11,49 +11,61 @@ diff -ruN a/config/mk/google_devices/device/komodo/conf/Android.bp b/config/mk/g
 diff -ruN a/config/mk/google_devices/device/komodo/conf/init.komodo.pwm.rc b/config/mk/google_devices/device/komodo/conf/init.komodo.pwm.rc
 --- a/config/mk/google_devices/device/komodo/conf/init.komodo.pwm.rc	1970-01-01 10:00:00.000000000 +1000
 +++ b/config/mk/google_devices/device/komodo/conf/init.komodo.pwm.rc	2026-11-08 22:44:49.418608391 +1100
-@@ -0,0 +1,42 @@
-+# One-byte PWM experiment. Never restore an experimental selection at boot.
-+# Kernel pwm_mode defaults to -1 (stock), including before Android init runs.
+@@ -0,0 +1,51 @@
++# Pixel 8 Pro-style 4-byte + DPP matrix PWM experiment.
++# Never restore an experimental selection at boot: kernel defaults to stock
++# (freq_cmd=0,0,0,0 and linear_matrix_application_threshold=1), and early-boot
++# resets the RAM-only property and module parameters to stock.
 +on early-boot
 +    setprop sys.komodo_high_emission_frequency_mode off
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode -1
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode -1
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x00,0x00,0x00,0x00
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x00,0x00,0x00,0x00
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 1
 +
 +on property:sys.komodo_high_emission_frequency_mode=off && property:sys.boot_completed=1
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode -1
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode -1
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x00,0x00,0x00,0x00
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x00,0x00,0x00,0x00
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 1
 +
 +on property:sys.komodo_high_emission_frequency_mode=zero && property:sys.boot_completed=1
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode 0
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode 0
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x00,0x43,0x43,0x03
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x00,0x43,0x43,0x03
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 600
 +
 +on property:sys.komodo_high_emission_frequency_mode=one && property:sys.boot_completed=1
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode 1
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode 1
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x01,0x43,0x43,0x03
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x01,0x43,0x43,0x03
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 600
 +
 +on property:sys.komodo_high_emission_frequency_mode=two && property:sys.boot_completed=1
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode 2
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode 2
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x02,0x43,0x43,0x03
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x02,0x43,0x43,0x03
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 600
 +
 +on property:sys.komodo_high_emission_frequency_mode=three && property:sys.boot_completed=1
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode 3
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode 3
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x03,0x43,0x43,0x03
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x03,0x43,0x43,0x03
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 600
 +
 +on property:sys.komodo_high_emission_frequency_mode=four && property:sys.boot_completed=1
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode 4
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode 4
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x04,0x43,0x43,0x03
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x04,0x43,0x43,0x03
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 600
 +
 +on property:sys.komodo_high_emission_frequency_mode=five && property:sys.boot_completed=1
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode 5
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode 5
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x05,0x43,0x43,0x03
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x05,0x43,0x43,0x03
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 600
 +
 +on property:sys.komodo_high_emission_frequency_mode=six && property:sys.boot_completed=1
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode 6
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode 6
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x06,0x43,0x43,0x03
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x06,0x43,0x43,0x03
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 600
 +
 +on property:sys.komodo_high_emission_frequency_mode=seven && property:sys.boot_completed=1
-+    write /sys/module/panel_gs_km4/parameters/pwm_mode 7
-+    write /sys/module/panel_gs_cm4/parameters/pwm_mode 7
++    write /sys/module/panel_gs_km4/parameters/freq_cmd 0x07,0x43,0x43,0x03
++    write /sys/module/panel_gs_cm4/parameters/freq_cmd 0x07,0x43,0x43,0x03
++    write /sys/module/exynos_drm/parameters/linear_matrix_application_threshold 600
 diff -ruN a/config/mk/google_devices/device/komodo/device.mk b/config/mk/google_devices/device/komodo/device.mk
 --- a/config/mk/google_devices/device/komodo/device.mk	2026-11-08 22:33:21.424393189 +1100
 +++ b/config/mk/google_devices/device/komodo/device.mk	2026-11-08 22:33:21.426393169 +1100

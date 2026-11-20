@@ -59,6 +59,7 @@ let
         ./asteroidos-find-phone.patch
         ./asteroidos-app-bridge.patch
         ./asteroidos-sync-time-default.patch
+        ./asteroidos-health-connect.patch
       ];
 
       gradleBuildFlags = [ ":app:assembleMainlineRelease" ];
