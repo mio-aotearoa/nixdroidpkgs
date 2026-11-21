@@ -139,7 +139,7 @@ new file mode 100644
 index 0000000..6308f75
 --- /dev/null
 +++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSSampleProvider.java
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,98 @@
 +/*  Copyright (C) 2026 AsteroidOS / Matawaa
 +
 +    This file is part of Gadgetbridge.
@@ -228,7 +228,11 @@ index 0000000..6308f75
 +        if (sample.getSteps() > 0) {
 +            existing.setSteps(sample.getSteps());
 +        }
-+        if (sample.getRawKind() != ActivityKind.UNKNOWN.getCode()) {
++        final int existingKind = existing.getRawKind();
++        final boolean existingSleep = existingKind == ActivityKind.SLEEP_ANY.getCode()
++                || existingKind == ActivityKind.AWAKE_SLEEP.getCode();
++        if (sample.getRawKind() != ActivityKind.UNKNOWN.getCode()
++                && !(existingSleep && sample.getRawKind() == ActivityKind.ACTIVITY.getCode())) {
 +            existing.setRawKind(sample.getRawKind());
 +        }
 +        addGBActivitySample(existing);
