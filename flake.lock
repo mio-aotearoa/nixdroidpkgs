@@ -439,33 +439,6 @@
         "type": "github"
       }
     },
-    "openwrt-imagebuilder": {
-      "inputs": {
-        "flake-parts": [
-          "flake-parts"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "systems": [
-          "flake-utils",
-          "systems"
-        ]
-      },
-      "locked": {
-        "lastModified": 1795022193,
-        "narHash": "sha256-3/h2xoObkZcsqslMz7diIxHbh1fZ1P/yZ1naHAbqrao=",
-        "owner": "astro",
-        "repo": "nix-openwrt-imagebuilder",
-        "rev": "3d53dcc4d79b37f86da46a5bf874f7ec63d979a2",
-        "type": "github"
-      },
-      "original": {
-        "owner": "astro",
-        "repo": "nix-openwrt-imagebuilder",
-        "type": "github"
-      }
-    },
     "pre-commit-hooks-nix": {
       "inputs": {
         "flake-compat": "flake-compat_2",
@@ -535,7 +508,6 @@
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-python27": "nixpkgs-python27",
         "nurpkgs": "nurpkgs",
-        "openwrt-imagebuilder": "openwrt-imagebuilder",
         "robotnix": "robotnix",
         "squish-find-the-brains": "squish-find-the-brains",
         "treefmt-nix": "treefmt-nix"
