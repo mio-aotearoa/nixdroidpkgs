@@ -68,7 +68,7 @@ index 0000000..fd9818e
 +    }
 +}
 diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSDeviceCoordinator.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSDeviceCoordinator.java
-index 63b3767..668ef9a 100644
+index 63b3767..eba5687 100644
 --- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSDeviceCoordinator.java
 +++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSDeviceCoordinator.java
 @@ -21,6 +21,7 @@ import android.bluetooth.le.ScanFilter;
@@ -116,13 +116,13 @@ index 63b3767..668ef9a 100644
 +    }
 +
 +    @Override
-+    public boolean supportsRemSleep(@NonNull GBDevice device) {
++    public boolean supportsAwakeSleep(@NonNull GBDevice device) {
 +        return true;
 +    }
 +
 +    @Override
-+    public boolean supportsAwakeSleep(@NonNull GBDevice device) {
-+        return true;
++    public boolean supportsRemSleep(@NonNull GBDevice device) {
++        return false;
 +    }
 +
 +    @Nullable
@@ -136,10 +136,10 @@ index 63b3767..668ef9a 100644
      public DeviceSupport createDeviceSupport(final GBDevice device) {
 diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSSampleProvider.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSSampleProvider.java
 new file mode 100644
-index 0000000..1b25c12
+index 0000000..6308f75
 --- /dev/null
 +++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSSampleProvider.java
-@@ -0,0 +1,99 @@
+@@ -0,0 +1,94 @@
 +/*  Copyright (C) 2026 AsteroidOS / Matawaa
 +
 +    This file is part of Gadgetbridge.
@@ -213,34 +213,29 @@ index 0000000..1b25c12
 +    }
 +
 +    public void upsertSample(final AsteroidOSActivitySample sample) {
-+        final List<AsteroidOSActivitySample> nearSamples = getGBActivitySamples(
-+                sample.getTimestamp() - 60,
-+                sample.getTimestamp() + 60
++        final List<AsteroidOSActivitySample> existingSamples = getGBActivitySamples(
++                sample.getTimestamp(),
++                sample.getTimestamp()
 +        );
-+        if (nearSamples.isEmpty()) {
++        if (existingSamples.isEmpty()) {
 +            addGBActivitySample(sample);
 +            return;
 +        }
-+        AsteroidOSActivitySample nearest = nearSamples.get(0);
-+        for (final AsteroidOSActivitySample s : nearSamples) {
-+            if (Math.abs(sample.getTimestamp() - s.getTimestamp()) < Math.abs(sample.getTimestamp() - nearest.getTimestamp())) {
-+                nearest = s;
-+            }
-+        }
-+        if (sample.getHeartRate() > 0) {
-+            nearest.setHeartRate(sample.getHeartRate());
++        final AsteroidOSActivitySample existing = existingSamples.get(0);
++        if (sample.getHeartRate() > 0 && sample.getHeartRate() != 255) {
++            existing.setHeartRate(sample.getHeartRate());
 +        }
 +        if (sample.getSteps() > 0) {
-+            nearest.setSteps(sample.getSteps());
++            existing.setSteps(sample.getSteps());
 +        }
 +        if (sample.getRawKind() != ActivityKind.UNKNOWN.getCode()) {
-+            nearest.setRawKind(sample.getRawKind());
++            existing.setRawKind(sample.getRawKind());
 +        }
-+        addGBActivitySample(nearest);
++        addGBActivitySample(existing);
 +    }
 +}
 diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
-index 84cdaf2..e402621 100644
+index 84cdaf2..310d64e 100644
 --- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
 +++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
 @@ -61,6 +61,13 @@ import org.json.JSONException;
@@ -267,87 +262,180 @@ index 84cdaf2..e402621 100644
              broadcastAppBridge(msgType, appId, path, payload, null);
              return;
          }
-@@ -872,6 +882,88 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
+@@ -872,6 +882,181 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
          builder.queue();
      }
  
 +    private void ingestAsteroidHealthSummary(String payload) {
 +        try {
 +            final JSONObject obj = new JSONObject(payload);
-+            final int fallbackTs = obj.optInt("updated", (int) (System.currentTimeMillis() / 1000L));
-+            int hrTs = fallbackTs;
++            final String date = obj.optString("date", "");
++
++            int hrTs = 0;
 +            int hrBpm = 0;
 +            final String latestHr = obj.optString("latestHr", "");
 +            if (!latestHr.isEmpty()) {
 +                final String[] p = latestHr.split(":");
 +                if (p.length >= 2) {
-+                    hrTs = Integer.parseInt(p[0]);
-+                    hrBpm = Integer.parseInt(p[1]);
-+                }
-+            }
-+
-+            int stepsTs = fallbackTs;
-+            int stepsVal = 0;
-+            final String latestSteps = obj.optString("latestSteps", "");
-+            if (!latestSteps.isEmpty()) {
-+                final String[] p = latestSteps.split(":");
-+                if (p.length >= 2) {
-+                    stepsTs = Integer.parseInt(p[0]);
-+                    stepsVal = Integer.parseInt(p[1]);
-+                }
-+            }
-+
-+            int sleepTs = fallbackTs;
-+            int sleepStage = -1;
-+            int sleepBpm = 0;
-+            final String latestSleep = obj.optString("latestSleep", "");
-+            if (!latestSleep.isEmpty()) {
-+                final String[] p = latestSleep.split(":");
-+                if (p.length >= 2) {
-+                    sleepTs = Integer.parseInt(p[0]);
-+                    sleepStage = Integer.parseInt(p[1]);
-+                    if (p.length >= 4) {
-+                        sleepBpm = Integer.parseInt(p[3]);
++                    try {
++                        hrTs = Integer.parseInt(p[0].trim());
++                        hrBpm = Integer.parseInt(p[1].trim());
++                    } catch (NumberFormatException e) {
++                        LOG.warn("AsteroidOS: invalid latestHr '{}'", latestHr, e);
 +                    }
 +                }
 +            }
 +
-+            final int sampleTs = Math.max(fallbackTs, Math.max(hrTs, Math.max(stepsTs, sleepTs)));
-+            final int bpm = sleepBpm > 0 ? sleepBpm : hrBpm;
-+            final ActivityKind kind;
-+            switch (sleepStage) {
-+                case 0:
-+                    kind = ActivityKind.AWAKE_SLEEP;
-+                    break;
-+                case 1:
-+                    kind = ActivityKind.LIGHT_SLEEP;
-+                    break;
-+                case 2:
-+                    kind = ActivityKind.DEEP_SLEEP;
-+                    break;
-+                case 3:
-+                    kind = ActivityKind.REM_SLEEP;
-+                    break;
-+                default:
-+                    kind = stepsVal > 0 ? ActivityKind.ACTIVITY : ActivityKind.UNKNOWN;
-+                    break;
++            int stepsTs = 0;
++            int stepsTotal = -1;
++            final String latestSteps = obj.optString("latestSteps", "");
++            if (!latestSteps.isEmpty()) {
++                final String[] p = latestSteps.split(":");
++                if (p.length >= 2) {
++                    try {
++                        stepsTs = Integer.parseInt(p[0].trim());
++                        stepsTotal = Integer.parseInt(p[1].trim());
++                    } catch (NumberFormatException e) {
++                        LOG.warn("AsteroidOS: invalid latestSteps '{}'", latestSteps, e);
++                    }
++                }
 +            }
 +
-+            try (DBHandler dbHandler = GBApplication.acquireDB()) {
-+                final AsteroidOSSampleProvider provider = new AsteroidOSSampleProvider(getDevice(), dbHandler.getDaoSession());
-+                final AsteroidOSActivitySample sample = provider.createActivitySample();
-+                sample.setDevice(DBHelper.getDevice(getDevice(), dbHandler.getDaoSession()));
-+                sample.setUser(DBHelper.getUser(dbHandler.getDaoSession()));
-+                sample.setTimestamp(sampleTs);
-+                sample.setRawKind(kind.getCode());
-+                sample.setSteps(Math.max(0, stepsVal));
-+                sample.setHeartRate(bpm > 0 ? bpm : ActivitySample.NOT_MEASURED);
-+                provider.upsertSample(sample);
++            int sleepTs = 0;
++            int sleepState = -1;
++            final String latestSleep = obj.optString("latestSleep", "");
++            if (!latestSleep.isEmpty()) {
++                final String[] p = latestSleep.split(":");
++                // Only accept 2-field sleep/wake states (<epoch_sec>:<0|1>) from van Hees (2015/2018) detector;
++                // ignore legacy 4-field unvalidated stage records.
++                if (p.length == 2) {
++                    try {
++                        sleepTs = Integer.parseInt(p[0].trim());
++                        sleepState = Integer.parseInt(p[1].trim());
++                    } catch (NumberFormatException e) {
++                        LOG.warn("AsteroidOS: invalid latestSleep '{}'", latestSleep, e);
++                    }
++                }
 +            }
 +
-+            final Intent intent = new Intent(GBApplication.ACTION_NEW_DATA)
-+                    .putExtra(GBDevice.EXTRA_DEVICE, getDevice());
-+            LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent);
++            final SharedPreferences prefs = getDataLayerPrefs();
++            final String rawAddress = getDevice().getAddress();
++            final String deviceKey = (rawAddress != null && !rawAddress.isEmpty()) ? rawAddress : "default";
++            final String hrTsKey = "health_hr_ts|" + deviceKey;
++            final String stepsDateKey = "health_steps_date|" + deviceKey;
++            final String stepsTsKey = "health_steps_ts|" + deviceKey;
++            final String stepsTotalKey = "health_steps_total|" + deviceKey;
++            final String sleepTsKey = "health_sleep_ts|" + deviceKey;
++
++            final int lastHrTs = prefs.getInt(hrTsKey, 0);
++            final boolean ingestHr = hrTs > lastHrTs && hrBpm >= 1 && hrBpm <= 300 && hrBpm != 255;
++
++            final String lastStepsDate = prefs.getString(stepsDateKey, "");
++            final int lastStepsTs = prefs.getInt(stepsTsKey, 0);
++            final int lastStepsTotal = prefs.getInt(stepsTotalKey, -1);
++            final boolean hasNewStepsRecord = stepsTs > lastStepsTs && stepsTotal >= 0;
++            int stepsDelta = 0;
++            if (hasNewStepsRecord) {
++                if (!date.isEmpty() && date.equals(lastStepsDate) && lastStepsTotal >= 0) {
++                    stepsDelta = stepsTotal >= lastStepsTotal ? (stepsTotal - lastStepsTotal) : stepsTotal;
++                } else {
++                    stepsDelta = stepsTotal;
++                }
++            }
++            final boolean ingestSteps = hasNewStepsRecord && stepsDelta > 0;
++
++            final int lastSleepTs = prefs.getInt(sleepTsKey, 0);
++            final JSONArray sleepSegments = obj.optJSONArray("sleepSegments");
++            final boolean hasSleepSegments = sleepSegments != null && sleepSegments.length() > 0;
++            final boolean ingestSingleSleep = !hasSleepSegments && sleepTs > lastSleepTs && (sleepState == 0 || sleepState == 1);
++            int maxIngestedSleepTs = lastSleepTs;
++            boolean ingestedAnySleep = false;
++
++            if (ingestHr || ingestSteps || hasSleepSegments || ingestSingleSleep) {
++                try (DBHandler dbHandler = GBApplication.acquireDB()) {
++                    final AsteroidOSSampleProvider provider = new AsteroidOSSampleProvider(getDevice(), dbHandler.getDaoSession());
++                    if (ingestHr) {
++                        final AsteroidOSActivitySample hrSample = provider.createActivitySample();
++                        hrSample.setDevice(DBHelper.getDevice(getDevice(), dbHandler.getDaoSession()));
++                        hrSample.setUser(DBHelper.getUser(dbHandler.getDaoSession()));
++                        hrSample.setTimestamp(hrTs);
++                        hrSample.setRawKind(ActivityKind.UNKNOWN.getCode());
++                        hrSample.setSteps(0);
++                        hrSample.setHeartRate(hrBpm);
++                        provider.upsertSample(hrSample);
++                    }
++                    if (ingestSteps) {
++                        final AsteroidOSActivitySample stepSample = provider.createActivitySample();
++                        stepSample.setDevice(DBHelper.getDevice(getDevice(), dbHandler.getDaoSession()));
++                        stepSample.setUser(DBHelper.getUser(dbHandler.getDaoSession()));
++                        stepSample.setTimestamp(stepsTs);
++                        stepSample.setRawKind(ActivityKind.ACTIVITY.getCode());
++                        stepSample.setSteps(stepsDelta);
++                        stepSample.setHeartRate(ActivitySample.NOT_MEASURED);
++                        provider.upsertSample(stepSample);
++                    }
++                    if (hasSleepSegments) {
++                        for (int i = 0; i < sleepSegments.length(); i++) {
++                            final JSONArray seg = sleepSegments.optJSONArray(i);
++                            if (seg == null || seg.length() < 3) continue;
++                            final int segStart = seg.optInt(0, 0);
++                            final int segMinutes = seg.optInt(1, 0);
++                            final int segState = seg.optInt(2, -1);
++                            if (segStart <= 0 || segMinutes <= 0 || segMinutes > 1440 || (segState != 0 && segState != 1)) {
++                                continue;
++                            }
++                            final int rawKind = (segState == 1 ? ActivityKind.SLEEP_ANY : ActivityKind.AWAKE_SLEEP).getCode();
++                            for (int m = 0; m < segMinutes; m++) {
++                                final int ts = segStart + m * 60;
++                                if (ts <= lastSleepTs) continue;
++                                final AsteroidOSActivitySample sleepSample = provider.createActivitySample();
++                                sleepSample.setDevice(DBHelper.getDevice(getDevice(), dbHandler.getDaoSession()));
++                                sleepSample.setUser(DBHelper.getUser(dbHandler.getDaoSession()));
++                                sleepSample.setTimestamp(ts);
++                                sleepSample.setRawKind(rawKind);
++                                sleepSample.setSteps(0);
++                                sleepSample.setHeartRate(ActivitySample.NOT_MEASURED);
++                                provider.upsertSample(sleepSample);
++                                if (ts > maxIngestedSleepTs) maxIngestedSleepTs = ts;
++                                ingestedAnySleep = true;
++                            }
++                        }
++                    } else if (ingestSingleSleep) {
++                        final AsteroidOSActivitySample sleepSample = provider.createActivitySample();
++                        sleepSample.setDevice(DBHelper.getDevice(getDevice(), dbHandler.getDaoSession()));
++                        sleepSample.setUser(DBHelper.getUser(dbHandler.getDaoSession()));
++                        sleepSample.setTimestamp(sleepTs);
++                        sleepSample.setRawKind((sleepState == 1 ? ActivityKind.SLEEP_ANY : ActivityKind.AWAKE_SLEEP).getCode());
++                        sleepSample.setSteps(0);
++                        sleepSample.setHeartRate(ActivitySample.NOT_MEASURED);
++                        provider.upsertSample(sleepSample);
++                        maxIngestedSleepTs = sleepTs;
++                        ingestedAnySleep = true;
++                    }
++                }
++            }
++
++            if (ingestHr || hasNewStepsRecord || ingestedAnySleep) {
++                final SharedPreferences.Editor editor = prefs.edit();
++                if (ingestHr) {
++                    editor.putInt(hrTsKey, hrTs);
++                }
++                if (hasNewStepsRecord) {
++                    editor.putString(stepsDateKey, date);
++                    editor.putInt(stepsTsKey, stepsTs);
++                    editor.putInt(stepsTotalKey, stepsTotal);
++                }
++                if (ingestedAnySleep) {
++                    editor.putInt(sleepTsKey, maxIngestedSleepTs);
++                }
++                editor.apply();
++            }
++
++            if (ingestHr || ingestSteps || ingestedAnySleep) {
++                final Intent intent = new Intent(GBApplication.ACTION_NEW_DATA)
++                        .putExtra(GBDevice.EXTRA_DEVICE, getDevice());
++                LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent);
++            }
 +        } catch (Exception e) {
 +            LOG.warn("AsteroidOS: failed to ingest health summary", e);
 +        }
