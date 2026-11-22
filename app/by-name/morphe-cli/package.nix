@@ -12,7 +12,7 @@
   multidexlib2-src,
 
   morphe-library-m2_1_4_0,
-  morphe-patcher-src_2_4_0,
+  morphe-patcher-src_2_5_0,
   writeShellScriptBin,
   nix-update,
   jq,
@@ -40,13 +40,13 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "morphe-cli";
-  version = "2.2.0";
+  version = "2.3.0";
 
   src = fetchFromGitHub {
     owner = "MorpheApp";
     repo = "morphe-cli";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-tCeWNg8NKH2SXq8mBeMsJL00SkzbQySApxGaQaqxq/k=";
+    hash = "sha256-VVC2PfnoKR+tjW2i8ullKSRCQJI1HtgX547bJ2YkQbM=";
   };
 
   gradleBuildTask = "shadowJar";
@@ -83,7 +83,7 @@ stdenv.mkDerivation (finalAttrs: {
     root="$PWD"
 
     # Copy dependency sources as writable sibling directories.
-    cp -a ${morphe-patcher-src_2_4_0} "$root/morphe-patcher"
+    cp -a ${morphe-patcher-src_2_5_0} "$root/morphe-patcher"
     chmod -R u+w "$root/morphe-patcher"
 
     cp -a ${arsclib-src} "$root/ARSCLib"

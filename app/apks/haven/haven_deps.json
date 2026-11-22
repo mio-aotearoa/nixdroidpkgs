@@ -3366,6 +3366,33 @@
    "jar": "sha256-Z4Vn5ItRpCxlxpnyZlOa09Z21LGlsK19iezoudV3JXk=",
    "pom": "sha256-edpBDIwPRqP46K2zDWwkzNYGW272v96HvZfpiB6gouc="
   },
+  "org/commonmark#commonmark-ext-autolink/0.32.0": {
+   "jar": "sha256-nbMFG79kASvDU7C3siG2VY4XpW/EckHJJQqg+tZjxK8=",
+   "pom": "sha256-yZo6f92/HS3lZOdSvB4axfqyMT6Uj7Ro2xATLBtak0g="
+  },
+  "org/commonmark#commonmark-ext-gfm-alerts/0.32.0": {
+   "jar": "sha256-0HyTpz/wzNn4hC+Jip+yvLt12QAQUvcwnIrLqp+FaYs=",
+   "pom": "sha256-5OolVSQ8gtAtEkwnH+jbFkrqM+o9CZ1w0HVWyO70naI="
+  },
+  "org/commonmark#commonmark-ext-gfm-strikethrough/0.32.0": {
+   "jar": "sha256-d6r8LAtNEdtvijjQHSD3jskJWzk3nnaP4gB3CKcfgwM=",
+   "pom": "sha256-sDUq8ija3QmDSdPPCjUWfjTCKao0IqCC5jGaAd1O/vk="
+  },
+  "org/commonmark#commonmark-ext-gfm-tables/0.32.0": {
+   "jar": "sha256-URuaKCyZFWCsq2qwh6fyXkzpR0eqO/puCL4y2a3He+A=",
+   "pom": "sha256-iN7mMG6SkctfeTNl8EpNlmnqJkJIr9OJH6Ea8TsaqOc="
+  },
+  "org/commonmark#commonmark-ext-task-list-items/0.32.0": {
+   "jar": "sha256-HGyUm48Zlb5dPOa0bjl03UfgQ4CSjuTP+u/MPjtkCcY=",
+   "pom": "sha256-cGYmkvDWsF1iLASMTRCPDBHOwY2aFhyKpjcIYKy6eIw="
+  },
+  "org/commonmark#commonmark-parent/0.32.0": {
+   "pom": "sha256-Z6BAQ5TORiuomtnG2DhbJOvvOSd4AzHHt2l2qfaRrII="
+  },
+  "org/commonmark#commonmark/0.32.0": {
+   "jar": "sha256-pwdSkaH/hS324YWWOgAW0kkTq/aJ9PkT0BfZ/xmhSsI=",
+   "pom": "sha256-g1qfBuGwgqLR0pNSmh8kz8/H8a5YSFgS7Du7rdxQitk="
+  },
   "org/connectbot#jbcrypt/1.0.2": {
    "jar": "sha256-wpRnYg3JT3/hNEqUHCLFoCPuOjltTeHUPMtwLL/oK3s=",
    "module": "sha256-3ewWNdI+1tpay34TcUDVqESxunCZ99gNbvcdJnF8xQE=",
@@ -4151,6 +4178,10 @@
   "org/msgpack#msgpack-core/0.9.8": {
    "jar": "sha256-HTpha505JEfSb2siPsv75idr8of4H1SQsMSf9Vtob3w=",
    "pom": "sha256-u4D60T5fabCRH95YrhGZHTB6n1j2+6UWY59lrL+3Kqg="
+  },
+  "org/nibor/autolink#autolink/0.12.0": {
+   "jar": "sha256-BGR++Ym9gJbPwlOotbjDZ2CRjj8WPB2Rjfbfv7eaqMY=",
+   "pom": "sha256-61Tilrfa+U86X551AsxtWb9PBPUPmaaeICAvKbxyVf0="
   },
   "org/ow2#ow2/1.5.1": {
    "pom": "sha256-Mh3bt+5v5PU96mtM1tt0FU1r+kI5HB92OzYbn0hazwU="

@@ -310,7 +310,7 @@ let
 
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
-        outputHash = "sha256-VYC02nXR8BWpgHPs+EJEDhLZUV4z+iLOgk7l3jw1iP0=";
+        outputHash = "sha256-go9tRQuEVNeceqzNeGJyMt5sy8nbGrAF9r2Nz8qfGaE=";
         dontConfigure = true;
         dontFixup = true;
 
@@ -465,7 +465,7 @@ let
               -ldflags "-s -w -checklinkname=0" \
               -v \
               -o ../build/rcbridge.aar \
-              . ./wgbridge ./tsbridge ./mailbridge ./nbbridge ./ovpnbridge ./ocbridge
+              . ./wgbridge ./yggbridge ./tsbridge ./mailbridge ./nbbridge ./ovpnbridge ./ocbridge
 
 
           cd ..
@@ -543,7 +543,7 @@ let
     in
     {
       pname = "haven";
-      version = "5.94.57";
+      version = "5.94.62";
 
       __darwinAllowLocalNetworking = true;
       __noChroot = stdenv.hostPlatform.isDarwin;
@@ -554,7 +554,7 @@ let
         name = "haven-${finalAttrs0.version}-source";
         tag = "v${finalAttrs0.version}";
         fetchSubmodules = true;
-        hash = "sha256-NPfGh0JuI9SsFgtG6Fa93YxpqS12/2kdkqzOLx/wBLA=";
+        hash = "sha256-Lz7kqS5X27+T7KUj5wASbsB9gBzuPMPID9UpXDA5WaQ=";
       };
 
       patches = [

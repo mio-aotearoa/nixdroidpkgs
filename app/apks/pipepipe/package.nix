@@ -3,12 +3,16 @@
   lib,
   jdk17_headless,
   jdk25_headless,
-  gradle_9,
+  gradle_9_5_1,
   stdenv,
   buildGradlePackage,
   fetchFromGitHub,
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
+  writeShellScriptBin,
+  git,
+  curl,
+  jq,
 }:
 let
   appPackage =
@@ -21,11 +25,17 @@ let
         s."build-tools-36-0-0"
       ]);
 
-      gradle = gradle_9;
+      gradle = gradle_9_5_1;
+      # Tools used by passthru.updateScript to resolve upstream tags.
+      updatePath = lib.makeBinPath [
+        git
+        curl
+        jq
+      ];
     in
     buildGradlePackage (finalAttrs: {
       pname = "pipepipe";
-      version = "5.5.0";
+      version = "5.6.0";
 
       src = stdenv.mkDerivation {
         name = "pipepipe-src";
@@ -33,19 +43,19 @@ let
           owner = "InfinityLoop1308";
           repo = "PipePipe";
           tag = "v${finalAttrs.version}";
-          hash = "sha256-pqjAFhd7L48unrWfTAOuqDGRDln1fDXZ5xhb7X5sG38=";
+          hash = "sha256-exHSfO4HEXr2vAXYaa+GeRtsyVsXPWe1iDEUs49xFp0=";
         };
         clientSrc = fetchFromGitHub {
           owner = "InfinityLoop1308";
           repo = "PipePipeClient";
-          rev = "b91f008fb4d25b470c4383dcf42e31ee7696d272";
-          hash = "sha256-dIeoEdJ03W030fjLZtX+x26z7uQ69FDQ4t/Exs97izY=";
+          rev = "43ef494c1a1792a774c223e1982ff1e794c49017";
+          hash = "sha256-y5oges/vh/hFPgEIZ06Zmgih9c7Q4LSIH3aoj0pZ0HI=";
         };
         extractorSrc = fetchFromGitHub {
           owner = "InfinityLoop1308";
           repo = "PipePipeExtractor";
-          rev = "1a09d20e68dbd0892995bc58ffa539049a656690";
-          hash = "sha256-jiHFjU/uXQUdttTxQPQjYssZuJxJL6cz/qiKK5ZH5vc=";
+          rev = "e9818f8ef16d3720107c51f6ee157aecb1da2b70";
+          hash = "sha256-0QJmxFjcHqC7c9VVAPcb18dIZDD/AOpLj0BzfEjn078=";
         };
         installPhase = ''
           cp -r $clientSrc $out
@@ -106,6 +116,40 @@ let
 
       passthru = {
         androidSdk = androidSdk;
+        # `nix-update` cannot bump this package: the tag only pins the
+        # PipePipeClient/PipePipeExtractor submodule commits, and the buildable
+        # source is a combination of those two repositories. Resolve the new
+        # tag and its submodule commits from the PipePipe repository instead.
+        updateScript = writeShellScriptBin "update-pipepipe" ''
+          set -euo pipefail
+          package_file="app/apks/pipepipe/package.nix"
+          package_attr=".#apk_pipepipe"
+          fake_hash="${lib.fakeHash}"
+          export PATH="${updatePath}:$PATH"
+          . "${../_shared/update-script-helpers.sh}"
+
+          tag="$(git ls-remote --tags https://github.com/InfinityLoop1308/PipePipe.git 'refs/tags/v*' \
+            | sed 's#.*refs/tags/##' | grep -Ev -- '\^\{|-(beta|alpha|rc)' \
+            | grep -E '^v[0-9]+(\.[0-9]+)+$' | sort -V | tail -n 1)"
+          test -n "$tag"
+          version="''${tag#v}"
+          replace_literal "$(nix eval --raw "$package_attr.version")" "$version"
+          # `src` is the combined client/extractor tree; `src.src` is the
+          # PipePipe tag tarball whose hash tracks the version.
+          refresh_fod_hash src.src
+
+          tree="$(curl -fsSL "https://api.github.com/repos/InfinityLoop1308/PipePipe/git/trees/$tag")"
+          replace_literal \
+            "$(nix eval --raw "$package_attr.src.clientSrc.rev")" \
+            "$(jq -r '.tree[] | select(.path == "PipePipeClient") | .sha' <<<"$tree")"
+          replace_literal \
+            "$(nix eval --raw "$package_attr.src.extractorSrc.rev")" \
+            "$(jq -r '.tree[] | select(.path == "PipePipeExtractor") | .sha' <<<"$tree")"
+          refresh_fod_hash src.clientSrc
+          refresh_fod_hash src.extractorSrc
+
+          refresh_gradle_lock ${gradle.version} app/apks/pipepipe/gradle.lock
+        '';
       };
 
       meta = with lib; {
