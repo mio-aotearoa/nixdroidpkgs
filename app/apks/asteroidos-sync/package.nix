@@ -5,6 +5,7 @@
   gradle_7_5,
   stdenv,
   fetchFromGitHub,
+  fetchpatch,
   fetchurl,
   runCommand,
   writableTmpDirAsHomeHook,
@@ -52,7 +53,10 @@ let
 
       patches = [
         ./easyweather-from-source.patch
-        ./upstream-asteroidos-find-phone.patch
+        (fetchpatch {
+          url = "https://github.com/AsteroidOS/AsteroidOSSync/pull/236.diff";
+          hash = "sha256-Rtwcpc19Ask4xXE2JStbsnHWPFqiS/GwNxO9H8oHaPM=";
+        })
         ./asteroidos-app-bridge.patch
         ./sync-time-default.patch
       ];

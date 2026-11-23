@@ -5,6 +5,7 @@
   gradle_9_7_1,
   stdenv,
   fetchgit,
+  fetchpatch,
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
@@ -56,7 +57,10 @@ let
         ./gadgetbridge.patch
         ./deterministic-release-build.patch
         ./fix-fossil-hr-build.patch
-        ./upstream-asteroidos-find-phone.patch
+        (fetchpatch {
+          url = "https://codeberg.org/Freeyourgadget/Gadgetbridge/pulls/7419.diff";
+          hash = "sha256-hKnu5Of8614JwBzGqVGgWN0OaP3+I95VSU8Pw75p8Ww=";
+        })
         ./asteroidos-app-bridge.patch
         ./asteroidos-sync-time-default.patch
         ./asteroidos-health-connect.patch
