@@ -14,7 +14,7 @@ let
 
     installPhase = ''
       runHook preInstall
-      install -Dm644 $src/prebuilt/arm64/VanadiumWebView.apk $out/VanadiumWebView.apk
+      install -Dm644 "$src/prebuilt/arm64/VanadiumWebView.apk" "$out/VanadiumWebView.apk"
       runHook postInstall
     '';
 

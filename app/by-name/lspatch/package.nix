@@ -2,7 +2,6 @@
   lib,
   stdenv,
   fetchFromGitHub,
-  gradle-packages,
   androidSdkBuilder,
   jdk21_headless,
   makeWrapper,
