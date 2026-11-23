@@ -13,7 +13,7 @@
   nix-update,
 }:
 let
-  version = "0.1.6";
+  version = "0.1.7";
 
   # Upstream ships QEMU engines, Turnip, and the Apple-setup helper VM outside git
   # (pull-libs.sh / pull-libs26.sh / pull-setup.sh). Reuse the matching release APK
@@ -21,7 +21,7 @@ let
   # updateScript refreshes this hash via passthru.updateDeps after nix-update.
   prebuiltsApk = fetchurl {
     url = "https://github.com/alpersamur3/asoft-ios-android/releases/download/v${version}/ASoftware-iOS-Android-${version}.apk";
-    hash = "sha256-vvvMGzHYPxZocAEDAKKjAuNXCn02ItjenAL9iW7qoM8=";
+    hash = "sha256-Vh3Sj3uUPkWm87X9kk/aoxNVwSoKhotJHmN2c2TjjqQ=";
   };
 
   androidSdk = androidSdkBuilder (s: [
@@ -49,7 +49,7 @@ let
       owner = "alpersamur3";
       repo = "asoft-ios-android";
       tag = "v${finalAttrs.version}";
-      hash = "sha256-nfjJSd48YhjRtXab5BcVyARz+xC1dhE6psBFLjubNRU=";
+      hash = "sha256-0oQJNn3IIyCPs7pIkBC38hw2WsMA9inJga5dkoLmNEw=";
     };
 
     gradleBuildTask = ":app:assembleRelease";
