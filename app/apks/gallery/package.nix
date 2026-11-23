@@ -137,20 +137,17 @@ let
       "com.google.protobuf:protoc:4.26.1"."protoc-4.26.1-linux-x86_64.exe" =
         src:
         runCommand "protoc-4.26.1-linux-x86_64.exe" { } ''
-          cp ${src} $out
-          chmod +x $out
+          install -Dm755 "${src}" "$out"
         '';
       "com.google.protobuf:protoc:4.26.1"."protoc-4.26.1-osx-aarch_64.exe" =
         src:
         runCommand "protoc-4.26.1-osx-aarch_64.exe" { } ''
-          cp ${src} $out
-          chmod +x $out
+          install -Dm755 "${src}" "$out"
         '';
       "com.google.protobuf:protoc:4.26.1"."protoc-4.26.1-osx-x86_64.exe" =
         src:
         runCommand "protoc-4.26.1-osx-x86_64.exe" { } ''
-          cp ${src} $out
-          chmod +x $out
+          install -Dm755 "${src}" "$out"
         '';
     };
     buildJdk = jdk21_headless;

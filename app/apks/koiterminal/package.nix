@@ -124,8 +124,7 @@ let
       };
 
       patchedProtoc = runCommand "protoc-4.33.0" { } ''
-        cp ${protocRaw} $out
-        chmod +x $out
+        install -Dm755 "${protocRaw}" "$out"
       '';
 
       protocGenGrpcRaw = fetchurl {
@@ -139,13 +138,11 @@ let
             nativeBuildInputs = [ patchelf ];
           }
           ''
-            cp ${protocGenGrpcRaw} $out
-            chmod u+w $out
+            install -Dm755 "${protocGenGrpcRaw}" "$out"
             patchelf --page-size 2097152 \
                      --set-interpreter $(cat ${stdenv.cc}/nix-support/dynamic-linker) \
                      --set-rpath ${lib.makeLibraryPath [ stdenv.cc.cc.lib ]} \
-                     $out
-            chmod +x $out
+                     "$out"
           '';
     in
     {

@@ -137,13 +137,12 @@ let
     installPhase = ''
       runHook preInstall
 
-      mkdir $out
       apk_path="$(find app/build/outputs/apk -type f -name '*mobile*arm64*release*unsigned.apk' -print -quit)"
       if [ -z "$apk_path" ]; then
         echo "Could not find mobile arm64 release APK" >&2
         exit 1
       fi
-      mv "$apk_path" "$out/archivetune.apk"
+      install -Dm644 "$apk_path" "$out/archivetune.apk"
 
       runHook postInstall
     '';

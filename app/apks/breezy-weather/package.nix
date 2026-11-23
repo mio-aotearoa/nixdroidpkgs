@@ -70,7 +70,7 @@ let
       };
 
       postPatch = ''
-        substituteInPlace gradle/wrapper/gradle-wrapper.properties --replace-fail "gradle-9.4.1" "gradle-9.5.0" || true
+        substituteInPlace gradle/wrapper/gradle-wrapper.properties --replace-warn "gradle-9.4.1" "gradle-9.5.0"
         substituteInPlace buildSrc/src/main/kotlin/breezy/buildlogic/Commands.kt \
           --replace-fail 'return runCommand("git rev-list --count HEAD")' 'return "60127"' \
           --replace-fail 'return runCommand("git rev-parse --short=8 HEAD")' 'return "${lib.substring 0 8 rev}"'

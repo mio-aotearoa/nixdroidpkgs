@@ -160,8 +160,8 @@ let
       mv "$TMPDIR/x-mobile" "$out/x-mobile"
       # go get/tidy added anet for the Android patches. The offline build
       # starts from upstream sources, so keep the settled module files.
-      cp "$TMPDIR/tailscale.go.mod" "$out/tailscale.go.mod"
-      cp "$TMPDIR/tailscale.go.sum" "$out/tailscale.go.sum"
+      mv "$TMPDIR/tailscale.go.mod" "$out/tailscale.go.mod"
+      mv "$TMPDIR/tailscale.go.sum" "$out/tailscale.go.sum"
       runHook postInstall
     '';
   };

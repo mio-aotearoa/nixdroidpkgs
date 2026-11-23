@@ -230,13 +230,14 @@ stdenv.mkDerivation (
       "
     '';
     buildPhase = ''
+      runHook preBuild
       ${finalAttrs.gradleUpdateScript}
       runHook postBuild
     '';
 
     installPhase = ''
       runHook preInstall
-      install -Dm644 koreader-android-*.apk $out/koreader.apk
+      install -Dm644 koreader-android-*.apk "$out/koreader.apk"
       runHook postInstall
     '';
 

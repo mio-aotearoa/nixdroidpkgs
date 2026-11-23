@@ -58,13 +58,16 @@ let
           hash = "sha256-0QJmxFjcHqC7c9VVAPcb18dIZDD/AOpLj0BzfEjn078=";
         };
         installPhase = ''
-          cp -r $clientSrc $out
-          chmod -R +w $out
-          mkdir -p $out/PipePipeExtractor
-          cp -r $extractorSrc/* $out/PipePipeExtractor/
-          substituteInPlace $out/settings.gradle \
+          runHook preInstall
+          mkdir -p "$out"
+          cp -a "$clientSrc"/. "$out"/
+          chmod -R u+w "$out"
+          mkdir -p "$out/PipePipeExtractor"
+          cp -a "$extractorSrc"/* "$out/PipePipeExtractor/"
+          substituteInPlace "$out/settings.gradle" \
             --replace-fail "includeBuild('../PipePipeExtractor')" "includeBuild('./PipePipeExtractor')" \
             --replace-warn "id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'" ""
+          runHook postInstall
         '';
       };
 

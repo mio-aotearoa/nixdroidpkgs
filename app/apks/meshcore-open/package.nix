@@ -181,9 +181,11 @@ let
               --replace-fail "return fromGitHub(LibraryType.sqlite3);" "return LookupSystem('sqlite3');"
           '';
           installPhase = ''
+            runHook preInstall
             mkdir -p "$out"
             shopt -s dotglob
             mv ./* "$out/"
+            runHook postInstall
           '';
         };
 
