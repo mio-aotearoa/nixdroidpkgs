@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+import json
 import os
 import re
-import urllib.request
-import urllib.error
-import json
-import configparser
 import subprocess
+import urllib.error
+import urllib.request
+
 
 def is_stable_tag(tag, allow_prerelease=False):
     if allow_prerelease:
@@ -43,27 +43,6 @@ def tag_matches_variant(tag, current_rev):
             return False
                 
     return True
-
-def get_nvfetcher_managed():
-    managed = set()
-    if os.path.exists('nvfetcher.toml'):
-        try:
-            config = configparser.ConfigParser()
-            config.read('nvfetcher.toml')
-            for section in config.sections():
-                managed.add(section)
-        except Exception as e:
-            pass
-            
-    if os.path.exists('_sources/generated.json'):
-        try:
-            with open('_sources/generated.json') as f:
-                data = json.load(f)
-                for k in data.keys():
-                    managed.add(k)
-        except:
-            pass
-    return managed
 
 def get_latest_github_release(owner, repo, current_rev=None, allow_prerelease=False):
     needs_list = False
@@ -155,10 +134,9 @@ def get_latest_git_tag_url(url, current_rev=None, allow_prerelease=False):
         tags = []
         for line in output.splitlines():
             if not line.strip(): continue
-            sha, ref = line.split()
+            _, ref = line.split()
             tag = ref.replace("refs/tags/", "")
-            if tag.endswith('^{}'):
-                tag = tag[:-3]
+            tag = tag.removesuffix('^{}')
             tags.append(tag)
             
         tags = list(set(tags))
@@ -218,7 +196,8 @@ def resolve_version(rev, content, src_start=-1):
     return re.sub(r'\$\{([^}]+)\}', replacer, rev)
 
 def main():
-    managed = get_nvfetcher_managed()
+    # nvfetcher-managed packages carry `src = sources.<name>;` and are skipped by
+    # the source check below, so no separate managed-name list is needed here.
     dirs_to_check = ['app/apks', 'app/by-name']
     
     print("Checking for updates...")
@@ -244,7 +223,7 @@ def main():
             if not os.path.exists(pkg_nix):
                 continue
                 
-            with open(pkg_nix, 'r') as f:
+            with open(pkg_nix, encoding='utf-8') as f:
                 content = f.read()
                 
             if re.search(r'src\s*=\s*sources\.', content) and 'fetchFromGitHub' not in content and 'fetchFromGitLab' not in content and 'fetchFromGitea' not in content and 'fetchgit' not in content:

@@ -179,8 +179,8 @@ let
         '';
         installPhase = ''
           runHook preInstall
-          mkdir -p "$out/java"
-          cp -R sdk/src/main/java/. "$out/java/"
+          mkdir -p "$out"
+          mv sdk/src/main/java "$out/java"
           runHook postInstall
         '';
       };
@@ -235,7 +235,7 @@ let
 
         # Use locally built sdk-internal artifact instead of private GitHub Packages.
         find . -name "*.lockfile" -delete || true
-        substituteInPlace build.gradle.kts --replace-fail "lockMode.set(LockMode.STRICT)" "" || true
+        substituteInPlace build.gradle.kts --replace-warn "lockMode.set(LockMode.STRICT)" ""
         cat > user.properties <<EOF
         localSdk=true
         gitHubToken=

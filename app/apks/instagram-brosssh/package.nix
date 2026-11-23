@@ -17,8 +17,7 @@ let
   };
 
   brossshPatches = "${brosssh-patches}/patches-${brosssh-patches.version}.mpp";
-in
-let
+
   appPackage = stdenv.mkDerivation {
     pname = "instagram-brosssh";
     version = "422.0.0.0.35-patches-${brosssh-patches.version}";

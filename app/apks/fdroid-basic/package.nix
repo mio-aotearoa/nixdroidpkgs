@@ -1,9 +1,7 @@
 {
-  agp-resolution,
 
   androidSdkBuilder,
   fetchgit,
-  overrides-fromsrc,
   buildGradlePackage,
   gradle_9_4_1,
   jdk25_headless,
@@ -26,10 +24,11 @@ let
   ]);
 
   gradle = gradle_9_4_1;
-in
-buildGradlePackage rec {
-  pname = "fdroid-basic";
   version = "2.0.3";
+in
+buildGradlePackage {
+  pname = "fdroid-basic";
+  inherit version;
 
   __darwinAllowLocalNetworking = true;
   __noChroot = stdenv.hostPlatform.isDarwin;

@@ -8,7 +8,6 @@
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
-  fetchpatch,
 }:
 let
   version = "1.9.1.1";

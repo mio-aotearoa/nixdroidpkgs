@@ -348,7 +348,7 @@ let
         installPhase = ''
           runHook preInstall
           mkdir -p "$out"
-          cp -R "$VENDOR_PATH" "$out/vendor"
+          mv "$VENDOR_PATH" "$out/vendor"
           rm -rf "$TMPDIR/go-mod-cache/cache/download/sumdb"
           chmod -R u+w "$TMPDIR/go-mod-cache"
           mv "$TMPDIR/go-mod-cache" "$out/cache"

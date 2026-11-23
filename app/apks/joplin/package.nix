@@ -226,7 +226,7 @@ let
 
       passthru = {
         # Refreshed by passthru.updateScript alongside the source hash.
-        offlineCache = finalAttrs.offlineCache;
+        inherit (finalAttrs) offlineCache;
       };
 
       passthru.updateScript = writeShellScriptBin "update-joplin" ''

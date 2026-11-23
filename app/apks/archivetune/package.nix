@@ -52,7 +52,7 @@ let
     mitmCache = gradle.fetchDeps {
       inherit (finalAttrs) pname;
       attrPath = "apk_archivetune";
-      pkg = finalAttrs.finalPackage.overrideAttrs (old: {
+      pkg = finalAttrs.finalPackage.overrideAttrs (_old: {
         preConfigure = ''
           export ANDROID_USER_HOME="$HOME/.android"
           mkdir -p "$ANDROID_USER_HOME"
@@ -88,16 +88,14 @@ let
       ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = "${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2";
     };
 
-    prePatch = (
-      agp-resolution.patchSettingsGradle {
-        file = "settings.gradle.kts";
-        agpVersion = "9.5.1";
-        pluginIds = [
-          "com.android.application"
-          "com.android.library"
-        ];
-      }
-    );
+    prePatch = agp-resolution.patchSettingsGradle {
+      file = "settings.gradle.kts";
+      agpVersion = "9.5.1";
+      pluginIds = [
+        "com.android.application"
+        "com.android.library"
+      ];
+    };
 
     postPatch = ''
       echo "android.suppressUnsupportedCompileSdk=37.2" >> gradle.properties
@@ -139,13 +137,12 @@ let
     installPhase = ''
       runHook preInstall
 
-      mkdir $out
       apk_path="$(find app/build/outputs/apk -type f -name '*mobile*arm64*release*unsigned.apk' -print -quit)"
       if [ -z "$apk_path" ]; then
         echo "Could not find mobile arm64 release APK" >&2
         exit 1
       fi
-      mv "$apk_path" "$out/archivetune.apk"
+      install -Dm644 "$apk_path" "$out/archivetune.apk"
 
       runHook postInstall
     '';

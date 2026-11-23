@@ -1,10 +1,9 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 import yaml
-
 
 ROOT = Path(".")
 PACKAGE_CONFIG = ROOT / ".dart_tool" / "package_config.json"
@@ -153,7 +152,7 @@ def main() -> None:
             "windows": [],
         },
         "dependencyGraph": dependency_graph,
-        "date_created": datetime.now(timezone.utc).isoformat(),
+        "date_created": datetime.now(UTC).isoformat(),
         "version": "nix-generated",
     }
     PLUGINS_DEPS_FILE.write_text(

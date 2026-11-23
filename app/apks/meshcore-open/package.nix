@@ -181,9 +181,11 @@ let
               --replace-fail "return fromGitHub(LibraryType.sqlite3);" "return LookupSystem('sqlite3');"
           '';
           installPhase = ''
+            runHook preInstall
             mkdir -p "$out"
             shopt -s dotglob
             mv ./* "$out/"
+            runHook postInstall
           '';
         };
 
@@ -211,7 +213,7 @@ let
       };
 
       passthru = {
-        mitmCache = finalAttrs.mitmCache;
+        inherit (finalAttrs) mitmCache;
         inherit nativeCodecs;
         codecSources = { inherit ncnnSource aeicSource sqliteAndroid; };
         updateScript = writeShellScriptBin "update-meshcore-open" ''

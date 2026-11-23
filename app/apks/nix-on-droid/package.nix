@@ -102,7 +102,7 @@ let
       ];
 
       env = {
-        JAVA_HOME = (if bumpAGP then jdk21_headless else jdk17_headless);
+        JAVA_HOME = if bumpAGP then jdk21_headless else jdk17_headless;
         ANDROID_HOME = "${androidSdk}/share/android-sdk";
         ANDROID_SDK_ROOT = "${androidSdk}/share/android-sdk";
         ANDROID_NDK_ROOT =

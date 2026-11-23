@@ -4,7 +4,6 @@
   jdk21_headless,
   gradle_8_14_3,
   stdenv,
-  fetchgit,
   fetchFromGitHub,
 
   writableTmpDirAsHomeHook,

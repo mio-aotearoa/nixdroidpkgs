@@ -38,13 +38,15 @@ let
       gradle = gradle_9_7_1;
 
       pythonWithCrc32c = python3.withPackages (ps: [ ps.crc32c ]);
-    in
-    buildGradlePackage rec {
-      pname = "gadgetbridge";
+
       # Upstream tag; Android versionName / nix version append +<patchVersion>.
       upstreamVersion = "2026.11.1";
       patchVersion = "p2";
       version = "${upstreamVersion}+${patchVersion}";
+    in
+    buildGradlePackage {
+      pname = "gadgetbridge";
+      inherit version;
 
       src = fetchgit {
         url = "https://codeberg.org/Freeyourgadget/Gadgetbridge.git";

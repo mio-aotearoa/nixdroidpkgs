@@ -1,7 +1,5 @@
 {
-  agp-resolution,
   mk-apk-package,
-  overrides-fromsrc,
   buildGradlePackage,
   lib,
   jdk21_headless,
@@ -40,7 +38,7 @@ let
 
   gradle = gradle_9_7_0;
 
-  appPackage = buildGradlePackage rec {
+  appPackage = buildGradlePackage {
     pname = "sunup";
     inherit version src gradle;
 

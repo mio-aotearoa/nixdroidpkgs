@@ -2,7 +2,6 @@
   mk-apk-package,
   lib,
   jdk21_headless,
-  gradle-packages,
   stdenv,
   fetchgit,
 

@@ -6,7 +6,6 @@
   fetchgit,
   fetchurl,
   jdk17_headless,
-  gradle-packages,
   androidSdkBuilder,
   patchelf,
   qt5,
@@ -162,7 +161,7 @@ let
     };
 
     passthru = {
-      mitmCache = finalAttrs.mitmCache;
+      inherit (finalAttrs) mitmCache;
       updateScript = writeShellScriptBin "update-firebird" ''
         set -euo pipefail
         latest_rev="$(${lib.getExe git} ls-remote https://github.com/nspire-emus/firebird.git HEAD | cut -f1)"

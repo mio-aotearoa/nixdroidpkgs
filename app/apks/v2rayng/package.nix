@@ -203,7 +203,7 @@ let
 
       passthru = {
         inherit androidLibXrayLiteSrc androidLibXrayLiteGoModCache;
-        mitmCache = finalAttrs.mitmCache;
+        inherit (finalAttrs) mitmCache;
         updateDeps = [
           "androidLibXrayLiteSrc"
           "androidLibXrayLiteGoModCache"

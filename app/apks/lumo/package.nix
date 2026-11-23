@@ -71,9 +71,9 @@ let
 
       postPatch = ''
         substituteInPlace build.gradle.kts \
-          --replace-fail 'alias(libs.plugins.sentry.android.gradle) apply false' '// alias(libs.plugins.sentry.android.gradle) apply false' || true
+          --replace-warn 'alias(libs.plugins.sentry.android.gradle) apply false' '// alias(libs.plugins.sentry.android.gradle) apply false'
         substituteInPlace app/build.gradle.kts \
-          --replace-fail 'alias(libs.plugins.sentry.android.gradle)' '// alias(libs.plugins.sentry.android.gradle)' || true
+          --replace-warn 'alias(libs.plugins.sentry.android.gradle)' '// alias(libs.plugins.sentry.android.gradle)'
         substituteInPlace app/build.gradle.kts \
           --replace-fail 'signingConfig = signingConfigs.getByName("release")' \
             'signingConfig = if (isNoGms()) signingConfigs.getByName("debug") else signingConfigs.getByName("release")'

@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+#
 # Shared shell helpers for Flutter APK builds under app/apks/.
 # Source from postPatch/preBuild:  . "${flutterApkHelpers}"
 #
@@ -143,7 +145,7 @@ ensure_writable_dart_package() {
   if [[ "$package_dir" == /nix/store/* ]]; then
     if [ -z "${patched_pkg_dirs[$package_dir]:-}" ]; then
       name="$(dart_package_basename "$package_dir")"
-      patched_pkg_dirs[$package_dir]="$(clone_dart_package "$package_dir" "$name")"
+      patched_pkg_dirs["$package_dir"]="$(clone_dart_package "$package_dir" "$name")"
       if grep -Fq "$package_dir" .dart_tool/package_config.json; then
         replace_dart_package_root "$package_dir" "${patched_pkg_dirs[$package_dir]}"
       fi

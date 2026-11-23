@@ -15,8 +15,7 @@ let
   };
 
   pikoPatches = "${piko-patches}/patches-${piko-patches.version}.mpp";
-in
-let
+
   appPackage = stdenv.mkDerivation {
     pname = "twitter-piko";
     version = "11.77.0-release.0-patches-${piko-patches.version}";
