@@ -139,7 +139,7 @@ new file mode 100644
 index 0000000..6308f75
 --- /dev/null
 +++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/asteroidos/AsteroidOSSampleProvider.java
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,106 @@
 +/*  Copyright (C) 2026 AsteroidOS / Matawaa
 +
 +    This file is part of Gadgetbridge.
@@ -212,30 +212,38 @@ index 0000000..6308f75
 +        return new AsteroidOSActivitySample();
 +    }
 +
-+    public void upsertSample(final AsteroidOSActivitySample sample) {
++    public boolean upsertSample(final AsteroidOSActivitySample sample) {
 +        final List<AsteroidOSActivitySample> existingSamples = getGBActivitySamples(
 +                sample.getTimestamp(),
 +                sample.getTimestamp()
 +        );
 +        if (existingSamples.isEmpty()) {
 +            addGBActivitySample(sample);
-+            return;
++            return true;
 +        }
 +        final AsteroidOSActivitySample existing = existingSamples.get(0);
-+        if (sample.getHeartRate() > 0 && sample.getHeartRate() != 255) {
++        boolean changed = false;
++        if (sample.getHeartRate() > 0 && sample.getHeartRate() != 255
++                && sample.getHeartRate() != existing.getHeartRate()) {
++            changed = true;
 +            existing.setHeartRate(sample.getHeartRate());
 +        }
-+        if (sample.getSteps() > 0) {
++        if (sample.getSteps() > 0 && sample.getSteps() != existing.getSteps()) {
++            changed = true;
 +            existing.setSteps(sample.getSteps());
 +        }
 +        final int existingKind = existing.getRawKind();
 +        final boolean existingSleep = existingKind == ActivityKind.SLEEP_ANY.getCode()
 +                || existingKind == ActivityKind.AWAKE_SLEEP.getCode();
-+        if (sample.getRawKind() != ActivityKind.UNKNOWN.getCode()
++        if (sample.getRawKind() != existingKind && sample.getRawKind() != ActivityKind.UNKNOWN.getCode()
 +                && !(existingSleep && sample.getRawKind() == ActivityKind.ACTIVITY.getCode())) {
 +            existing.setRawKind(sample.getRawKind());
++            changed = true;
 +        }
-+        addGBActivitySample(existing);
++        if (changed) {
++            addGBActivitySample(existing);
++        }
++        return changed;
 +    }
 +}
 diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/asteroidos/AsteroidOSDeviceSupport.java
@@ -266,10 +274,12 @@ index 84cdaf2..310d64e 100644
              broadcastAppBridge(msgType, appId, path, payload, null);
              return;
          }
-@@ -872,6 +882,181 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
+@@ -872,6 +882,177 @@ public class AsteroidOSDeviceSupport extends AbstractBTLESingleDeviceSupport {
          builder.queue();
      }
  
++    private String lastImportedSleepSegments;
++
 +    private void ingestAsteroidHealthSummary(String payload) {
 +        try {
 +            final JSONObject obj = new JSONObject(payload);
@@ -329,7 +339,6 @@ index 84cdaf2..310d64e 100644
 +            final String stepsDateKey = "health_steps_date|" + deviceKey;
 +            final String stepsTsKey = "health_steps_ts|" + deviceKey;
 +            final String stepsTotalKey = "health_steps_total|" + deviceKey;
-+            final String sleepTsKey = "health_sleep_ts|" + deviceKey;
 +
 +            final int lastHrTs = prefs.getInt(hrTsKey, 0);
 +            final boolean ingestHr = hrTs > lastHrTs && hrBpm >= 1 && hrBpm <= 300 && hrBpm != 255;
@@ -348,14 +357,14 @@ index 84cdaf2..310d64e 100644
 +            }
 +            final boolean ingestSteps = hasNewStepsRecord && stepsDelta > 0;
 +
-+            final int lastSleepTs = prefs.getInt(sleepTsKey, 0);
 +            final JSONArray sleepSegments = obj.optJSONArray("sleepSegments");
 +            final boolean hasSleepSegments = sleepSegments != null && sleepSegments.length() > 0;
-+            final boolean ingestSingleSleep = !hasSleepSegments && sleepTs > lastSleepTs && (sleepState == 0 || sleepState == 1);
-+            int maxIngestedSleepTs = lastSleepTs;
++            final String serializedSleepSegments = hasSleepSegments ? sleepSegments.toString() : null;
++            final boolean ingestSleepSegments = hasSleepSegments && !serializedSleepSegments.equals(lastImportedSleepSegments);
++            final boolean ingestSingleSleep = !hasSleepSegments && sleepTs > 0 && (sleepState == 0 || sleepState == 1);
 +            boolean ingestedAnySleep = false;
 +
-+            if (ingestHr || ingestSteps || hasSleepSegments || ingestSingleSleep) {
++            if (ingestHr || ingestSteps || ingestSleepSegments || ingestSingleSleep) {
 +                try (DBHandler dbHandler = GBApplication.acquireDB()) {
 +                    final AsteroidOSSampleProvider provider = new AsteroidOSSampleProvider(getDevice(), dbHandler.getDaoSession());
 +                    if (ingestHr) {
@@ -378,7 +387,7 @@ index 84cdaf2..310d64e 100644
 +                        stepSample.setHeartRate(ActivitySample.NOT_MEASURED);
 +                        provider.upsertSample(stepSample);
 +                    }
-+                    if (hasSleepSegments) {
++                    if (ingestSleepSegments) {
 +                        for (int i = 0; i < sleepSegments.length(); i++) {
 +                            final JSONArray seg = sleepSegments.optJSONArray(i);
 +                            if (seg == null || seg.length() < 3) continue;
@@ -391,7 +400,6 @@ index 84cdaf2..310d64e 100644
 +                            final int rawKind = (segState == 1 ? ActivityKind.SLEEP_ANY : ActivityKind.AWAKE_SLEEP).getCode();
 +                            for (int m = 0; m < segMinutes; m++) {
 +                                final int ts = segStart + m * 60;
-+                                if (ts <= lastSleepTs) continue;
 +                                final AsteroidOSActivitySample sleepSample = provider.createActivitySample();
 +                                sleepSample.setDevice(DBHelper.getDevice(getDevice(), dbHandler.getDaoSession()));
 +                                sleepSample.setUser(DBHelper.getUser(dbHandler.getDaoSession()));
@@ -399,9 +407,7 @@ index 84cdaf2..310d64e 100644
 +                                sleepSample.setRawKind(rawKind);
 +                                sleepSample.setSteps(0);
 +                                sleepSample.setHeartRate(ActivitySample.NOT_MEASURED);
-+                                provider.upsertSample(sleepSample);
-+                                if (ts > maxIngestedSleepTs) maxIngestedSleepTs = ts;
-+                                ingestedAnySleep = true;
++                                ingestedAnySleep |= provider.upsertSample(sleepSample);
 +                            }
 +                        }
 +                    } else if (ingestSingleSleep) {
@@ -412,14 +418,15 @@ index 84cdaf2..310d64e 100644
 +                        sleepSample.setRawKind((sleepState == 1 ? ActivityKind.SLEEP_ANY : ActivityKind.AWAKE_SLEEP).getCode());
 +                        sleepSample.setSteps(0);
 +                        sleepSample.setHeartRate(ActivitySample.NOT_MEASURED);
-+                        provider.upsertSample(sleepSample);
-+                        maxIngestedSleepTs = sleepTs;
-+                        ingestedAnySleep = true;
++                        ingestedAnySleep = provider.upsertSample(sleepSample);
 +                    }
 +                }
 +            }
 +
-+            if (ingestHr || hasNewStepsRecord || ingestedAnySleep) {
++            if (ingestSleepSegments || ingestSingleSleep) {
++                lastImportedSleepSegments = serializedSleepSegments;
++            }
++            if (ingestHr || hasNewStepsRecord) {
 +                final SharedPreferences.Editor editor = prefs.edit();
 +                if (ingestHr) {
 +                    editor.putInt(hrTsKey, hrTs);
@@ -428,9 +435,6 @@ index 84cdaf2..310d64e 100644
 +                    editor.putString(stepsDateKey, date);
 +                    editor.putInt(stepsTsKey, stepsTs);
 +                    editor.putInt(stepsTotalKey, stepsTotal);
-+                }
-+                if (ingestedAnySleep) {
-+                    editor.putInt(sleepTsKey, maxIngestedSleepTs);
 +                }
 +                editor.apply();
 +            }
