@@ -52,7 +52,7 @@ let
 
       patches = [
         ./easyweather-from-source.patch
-        ./asteroidos-find-phone.patch
+        ./upstream-asteroidos-find-phone.patch
         ./asteroidos-app-bridge.patch
         ./sync-time-default.patch
       ];

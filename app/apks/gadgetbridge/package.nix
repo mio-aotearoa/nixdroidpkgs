@@ -56,7 +56,7 @@ let
         ./gadgetbridge.patch
         ./deterministic-release-build.patch
         ./fix-fossil-hr-build.patch
-        ./asteroidos-find-phone.patch
+        ./upstream-asteroidos-find-phone.patch
         ./asteroidos-app-bridge.patch
         ./asteroidos-sync-time-default.patch
         ./asteroidos-health-connect.patch
