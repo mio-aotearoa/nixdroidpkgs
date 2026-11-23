@@ -2,7 +2,6 @@
   mk-apk-package,
   lib,
   jdk25_headless,
-  gradle-packages,
   stdenv,
   fetchFromGitHub,
 

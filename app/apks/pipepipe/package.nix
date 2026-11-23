@@ -115,7 +115,7 @@ let
       '';
 
       passthru = {
-        androidSdk = androidSdk;
+        inherit androidSdk;
         # `nix-update` cannot bump this package: the tag only pins the
         # PipePipeClient/PipePipeExtractor submodule commits, and the buildable
         # source is a combination of those two repositories. Resolve the new

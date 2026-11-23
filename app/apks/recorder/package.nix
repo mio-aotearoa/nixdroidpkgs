@@ -1,11 +1,9 @@
 {
   mk-apk-package,
-  overrides-fromsrc,
   buildGradlePackage,
   sources,
   lib,
   jdk25_headless,
-  gradle-packages,
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,

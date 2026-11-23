@@ -211,7 +211,7 @@ let
       };
 
       passthru = {
-        mitmCache = finalAttrs.mitmCache;
+        inherit (finalAttrs) mitmCache;
         inherit nativeCodecs;
         codecSources = { inherit ncnnSource aeicSource sqliteAndroid; };
         updateScript = writeShellScriptBin "update-meshcore-open" ''

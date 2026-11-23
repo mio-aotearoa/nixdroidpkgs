@@ -8,7 +8,6 @@
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
-  git,
   writeShellScriptBin,
   nix-update,
 }:
@@ -58,7 +57,7 @@ let
       };
 
       passthru = {
-        mitmCache = finalAttrs.mitmCache;
+        inherit (finalAttrs) mitmCache;
         updateScript = writeShellScriptBin "update-microg-re" ''
           set -euo pipefail
           ${lib.getExe nix-update} --flake --src-only --version-regex='^v?([0-9]+\.[0-9]+\.[0-9]+)$' apk_microg-re

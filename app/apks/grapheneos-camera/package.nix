@@ -1,5 +1,4 @@
 {
-  agp-resolution,
   mk-apk-package,
   overrides-fromsrc,
   buildGradlePackage,

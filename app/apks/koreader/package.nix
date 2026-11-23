@@ -152,13 +152,6 @@ stdenv.mkDerivation (
       ./base.patch
     ];
 
-    passthru.srcOnly = srcOnly finalAttrs.finalPackage;
-    passthru.srcs = linkFarm "koreader-srcs" (
-      map (repo: {
-        name = repo.name;
-        path = repo;
-      }) (repos ++ [ finalAttrs.src ])
-    );
     nativeBuildInputs = [
       git
       cmake
@@ -247,10 +240,19 @@ stdenv.mkDerivation (
       runHook postInstall
     '';
 
-    passthru.signScript = mkSignScript {
-      name = "sign-koreader";
-      apkPath = "${placeholder "out"}/koreader.apk";
-      defaultOut = "koreader-signed.apk";
+    passthru = {
+      srcOnly = srcOnly finalAttrs.finalPackage;
+      srcs = linkFarm "koreader-srcs" (
+        map (repo: {
+          inherit (repo) name;
+          path = repo;
+        }) (repos ++ [ finalAttrs.src ])
+      );
+      signScript = mkSignScript {
+        name = "sign-koreader";
+        apkPath = "${placeholder "out"}/koreader.apk";
+        defaultOut = "koreader-signed.apk";
+      };
     };
     meta = with lib; {
       sourceProvenance = with sourceTypes; [ fromSource ];

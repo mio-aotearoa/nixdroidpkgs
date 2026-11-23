@@ -48,7 +48,7 @@ let
       gradleUpdateTask = finalAttrs.gradleBuildTask;
 
       passthru = {
-        mitmCache = finalAttrs.mitmCache;
+        inherit (finalAttrs) mitmCache;
         updateScript = nix-update-script { extraArgs = [ "--flake" ]; };
       };
 

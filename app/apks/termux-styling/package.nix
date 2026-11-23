@@ -32,7 +32,7 @@ let
       src = fetchFromGitHub {
         owner = "termux";
         repo = "termux-styling";
-        rev = rev;
+        inherit rev;
         hash = "sha256-sVKJFVloCruZUz9JhEdomizUM+S2vavk2c0C27lR8E4=";
       };
 

@@ -1,7 +1,5 @@
 {
   mk-apk-package,
-  overrides-fromsrc,
-  gradle,
   lib,
   jdk25_headless,
   gradle_9_5_1,
@@ -41,7 +39,7 @@ let
     gradleUpdateTask = "resolveAllDependencies :app:assembleGenericRelease --refresh-dependencies --no-build-cache --no-configuration-cache --no-daemon";
 
     passthru = {
-      mitmCache = finalAttrs.mitmCache;
+      inherit (finalAttrs) mitmCache;
       updateScript = nix-update-script { };
       prefab_jar = fetchurl {
         url = "https://maven.google.com/com/google/prefab/cli/2.1.0/cli-2.1.0-all.jar";

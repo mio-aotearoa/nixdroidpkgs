@@ -52,7 +52,7 @@ let
     mitmCache = gradle.fetchDeps {
       inherit (finalAttrs) pname;
       attrPath = "apk_archivetune";
-      pkg = finalAttrs.finalPackage.overrideAttrs (old: {
+      pkg = finalAttrs.finalPackage.overrideAttrs (_old: {
         preConfigure = ''
           export ANDROID_USER_HOME="$HOME/.android"
           mkdir -p "$ANDROID_USER_HOME"
@@ -88,16 +88,14 @@ let
       ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = "${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2";
     };
 
-    prePatch = (
-      agp-resolution.patchSettingsGradle {
-        file = "settings.gradle.kts";
-        agpVersion = "9.5.1";
-        pluginIds = [
-          "com.android.application"
-          "com.android.library"
-        ];
-      }
-    );
+    prePatch = agp-resolution.patchSettingsGradle {
+      file = "settings.gradle.kts";
+      agpVersion = "9.5.1";
+      pluginIds = [
+        "com.android.application"
+        "com.android.library"
+      ];
+    };
 
     postPatch = ''
       echo "android.suppressUnsupportedCompileSdk=37.2" >> gradle.properties

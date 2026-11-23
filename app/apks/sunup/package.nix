@@ -1,7 +1,5 @@
 {
-  agp-resolution,
   mk-apk-package,
-  overrides-fromsrc,
   buildGradlePackage,
   lib,
   jdk21_headless,

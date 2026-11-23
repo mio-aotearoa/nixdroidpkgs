@@ -1,9 +1,7 @@
 {
-  agp-resolution,
 
   androidSdkBuilder,
   fetchgit,
-  overrides-fromsrc,
   buildGradlePackage,
   gradle_9_4_1,
   jdk25_headless,

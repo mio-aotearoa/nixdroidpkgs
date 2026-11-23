@@ -1,6 +1,5 @@
 {
   mk-apk-package,
-  overrides-fromsrc,
   overrides-fromsrc-updated,
   buildGradlePackage,
   lib,

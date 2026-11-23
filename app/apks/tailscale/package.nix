@@ -12,7 +12,6 @@
   gnumake,
   zip,
   unzip,
-  fetchpatch,
   cacert,
   patch,
   git,
@@ -21,7 +20,6 @@ let
   appPackage =
     let
       version = "1.105.79-t47743a8b9-g37df07647";
-      tailscaleVersion = lib.head (lib.splitString "-" version);
 
       src = fetchFromGitHub {
         owner = "tailscale";

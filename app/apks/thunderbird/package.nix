@@ -3,13 +3,11 @@
   lib,
   jdk21_headless,
   jdk25_headless,
-  gradle-packages,
   stdenv,
   fetchFromGitHub,
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
-  fetchpatch,
   gradle_9_7_1,
   nix-update-script,
 }:
