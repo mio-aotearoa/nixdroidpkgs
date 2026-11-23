@@ -5,13 +5,13 @@ Subject: [PATCH] Add scanning QR/barcodes from a picked image
 
 ---
  .../java/app/grapheneos/camera/CamConfig.kt   | 13 ++++-
- .../grapheneos/camera/analyzer/QRAnalyzer.kt  | 28 +++++++++++
- .../camera/ui/activities/MainActivity.kt      | 50 +++++++++++++++++++
+ .../grapheneos/camera/analyzer/QRAnalyzer.kt  | 23 ++++++++-
+ .../camera/ui/activities/MainActivity.kt      | 44 +++++++++++++++++
  .../ui/activities/VideoCaptureActivity.kt     |  2 -
  app/src/main/res/drawable/scan_from_image.xml | 12 +++++
  app/src/main/res/layout/activity_main.xml     | 12 +++++
  app/src/main/res/values/strings.xml           |  3 ++
- 7 files changed, 117 insertions(+), 3 deletions(-)
+ 7 files changed, 105 insertions(+), 4 deletions(-)
  create mode 100644 app/src/main/res/drawable/scan_from_image.xml
 
 diff --git a/app/src/main/java/app/grapheneos/camera/CamConfig.kt b/app/src/main/java/app/grapheneos/camera/CamConfig.kt
@@ -46,7 +46,7 @@ index 7251ed7..41b57c2 100644
              mActivity.cancelButtonView.visibility = View.VISIBLE
  
 diff --git a/app/src/main/java/app/grapheneos/camera/analyzer/QRAnalyzer.kt b/app/src/main/java/app/grapheneos/camera/analyzer/QRAnalyzer.kt
-index 06820cf..dacd63a 100644
+index 1337f21..be23c00 100644
 --- a/app/src/main/java/app/grapheneos/camera/analyzer/QRAnalyzer.kt
 +++ b/app/src/main/java/app/grapheneos/camera/analyzer/QRAnalyzer.kt
 @@ -1,5 +1,6 @@
@@ -62,43 +62,51 @@ index 06820cf..dacd63a 100644
  import com.google.zxing.PlanarYUVLuminanceSource
 +import com.google.zxing.RGBLuminanceSource
  import com.google.zxing.ReaderException
- import com.google.zxing.common.HybridBinarizer
+ import com.google.zxing.Result
+ import com.google.zxing.ResultMetadataType
+@@ -17,7 +19,7 @@ import java.nio.charset.StandardCharsets
  import java.util.EnumMap
-@@ -17,6 +19,32 @@ import kotlin.math.roundToInt
- class QRAnalyzer(private val mActivity: MainActivity) : Analyzer {
+ import kotlin.math.roundToInt
+ 
+-class QRAnalyzer(private val mActivity: MainActivity) : Analyzer {
++class QRAnalyzer(private val mActivity: MainActivity, private val tryHarder: Boolean = false) : Analyzer {
      companion object {
          private const val TAG = "QRCodeImageAnalyzer"
-+
-+        fun scanStillImage(bitmap: Bitmap, possibleFormats: List<BarcodeFormat>): String? {
-+            val width = bitmap.width
-+            val height = bitmap.height
-+            val pixels = IntArray(width * height)
-+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-+
-+            val hints: MutableMap<DecodeHintType, Any> = EnumMap(DecodeHintType::class.java)
-+            hints[DecodeHintType.POSSIBLE_FORMATS] = possibleFormats
-+            hints[DecodeHintType.TRY_HARDER] = true
-+
-+            val reader = MultiFormatReader().apply { setHints(hints) }
-+
-+            val source = RGBLuminanceSource(width, height, pixels)
-+            decodeOrNull(reader, BinaryBitmap(HybridBinarizer(source)))?.let { return it }
-+            return decodeOrNull(reader, BinaryBitmap(HybridBinarizer(source.invert())))
-+        }
-+
-+        private fun decodeOrNull(reader: MultiFormatReader, binaryBitmap: BinaryBitmap): String? {
-+            reader.reset()
-+            return try {
-+                reader.decodeWithState(binaryBitmap).text
-+            } catch (e: ReaderException) {
-+                null
-+            }
-+        }
+ 
+@@ -54,12 +56,31 @@ class QRAnalyzer(private val mActivity: MainActivity) : Analyzer {
+                 camConfig.allowedFormats
+             }
+ 
++        if (tryHarder) supportedHints[DecodeHintType.TRY_HARDER] = true
+         reader.setHints(supportedHints)
+         rawReader.setHints(EnumMap(supportedHints).apply {
+             put(DecodeHintType.CHARACTER_SET, StandardCharsets.ISO_8859_1.name())
+         })
      }
  
-     private var frameCounter = 0
++    fun scanStillImage(bitmap: Bitmap): Boolean {
++        val pixels = IntArray(bitmap.width * bitmap.height)
++        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
++        val source = RGBLuminanceSource(bitmap.width, bitmap.height, pixels)
++        for (candidate in listOf(source, source.invert())) {
++            val binary = BinaryBitmap(HybridBinarizer(candidate))
++            reader.reset()
++            try {
++                val result = reader.decodeWithState(binary)
++                mActivity.onScanResultSuccess(result.text) { payloadBytes(result, binary) }
++                return true
++            } catch (_: ReaderException) {
++                // Try the opposite polarity.
++            }
++        }
++        return false
++    }
++
+     override fun analyze(image: ImageProxy) {
+         val plane = image.planes[0]
+         val byteBuffer = plane.buffer
 diff --git a/app/src/main/java/app/grapheneos/camera/ui/activities/MainActivity.kt b/app/src/main/java/app/grapheneos/camera/ui/activities/MainActivity.kt
-index 5391846..be22fb5 100644
+index 890226f..20505e2 100644
 --- a/app/src/main/java/app/grapheneos/camera/ui/activities/MainActivity.kt
 +++ b/app/src/main/java/app/grapheneos/camera/ui/activities/MainActivity.kt
 @@ -49,6 +49,7 @@ import android.widget.ProgressBar
@@ -109,7 +117,7 @@ index 5391846..be22fb5 100644
  import androidx.activity.result.contract.ActivityResultContracts
  import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
  import androidx.annotation.DrawableRes
-@@ -75,6 +76,7 @@ import app.grapheneos.camera.CameraMode
+@@ -77,6 +78,7 @@ import app.grapheneos.camera.CapturedItems
  import app.grapheneos.camera.ITEM_TYPE_IMAGE
  import app.grapheneos.camera.ITEM_TYPE_VIDEO
  import app.grapheneos.camera.R
@@ -117,7 +125,7 @@ index 5391846..be22fb5 100644
  import app.grapheneos.camera.capturer.ImageCapturer
  import app.grapheneos.camera.capturer.VideoCapturer
  import app.grapheneos.camera.capturer.getVideoThumbnail
-@@ -183,6 +185,9 @@ open class MainActivity : AppCompatActivity(),
+@@ -184,6 +186,9 @@ open class MainActivity : AppCompatActivity(),
      lateinit var thirdOption: View
      lateinit var imagePreview: ShapeableImageView
      lateinit var previewLoader: ProgressBar
@@ -127,7 +135,7 @@ index 5391846..be22fb5 100644
      private var isZooming = false
  
      lateinit var zoomBar: ZoomBar
-@@ -342,6 +347,42 @@ open class MainActivity : AppCompatActivity(),
+@@ -343,6 +348,36 @@ open class MainActivity : AppCompatActivity(),
          Log.i(TAG, "Selected location: ${data?.encodedPath!!}")
      }
  
@@ -151,18 +159,12 @@ index 5391846..be22fb5 100644
 +            return
 +        }
 +
-+        val possibleFormats = if (camConfig.scanAllCodes) {
-+            BarcodeFormat.values().asList()
-+        } else {
-+            camConfig.allowedFormats
++        val found = try {
++            QRAnalyzer(this, tryHarder = true).scanStillImage(bitmap)
++        } finally {
++            bitmap.recycle()
 +        }
-+
-+        val result = QRAnalyzer.scanStillImage(bitmap, possibleFormats)
-+        bitmap.recycle()
-+
-+        if (result != null) {
-+            onScanResultSuccess(result)
-+        } else {
++        if (!found) {
 +            showMessage(R.string.no_code_found_in_image)
 +        }
 +    }
@@ -170,7 +172,7 @@ index 5391846..be22fb5 100644
      private fun showAudioPermissionDeniedDialog(onDisableAudio: () -> Unit = {}) {
          val builder = MaterialAlertDialogBuilder(this)
              .setTitle(R.string.audio_permission_dialog_title)
-@@ -781,6 +822,15 @@ open class MainActivity : AppCompatActivity(),
+@@ -785,6 +820,15 @@ open class MainActivity : AppCompatActivity(),
          thirdOption = binding.thirdOption
          previewLoader = binding.previewLoading
          imagePreview = binding.imagePreview
