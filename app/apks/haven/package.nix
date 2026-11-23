@@ -310,7 +310,7 @@ let
 
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
-        outputHash = "sha256-go9tRQuEVNeceqzNeGJyMt5sy8nbGrAF9r2Nz8qfGaE=";
+        outputHash = "sha256-aEVbt7zZck+Nthri7oVBl5ghqj3syH/MRH5gkVPjbzE=";
         dontConfigure = true;
         dontFixup = true;
 
@@ -543,7 +543,7 @@ let
     in
     {
       pname = "haven";
-      version = "5.94.62";
+      version = "5.94.66";
 
       __darwinAllowLocalNetworking = true;
       __noChroot = stdenv.hostPlatform.isDarwin;
@@ -554,7 +554,7 @@ let
         name = "haven-${finalAttrs0.version}-source";
         tag = "v${finalAttrs0.version}";
         fetchSubmodules = true;
-        hash = "sha256-Lz7kqS5X27+T7KUj5wASbsB9gBzuPMPID9UpXDA5WaQ=";
+        hash = "sha256-+o0/N2lpR2VmzKL71lER4gzpWRwmXo3omkkP4etp1EI=";
       };
 
       patches = [
