@@ -134,10 +134,10 @@ index c4f6347c..895eab31 100644
  
 diff --git a/app/src/main/java/app/grapheneos/camera/remote/WatchRemote.kt b/app/src/main/java/app/grapheneos/camera/remote/WatchRemote.kt
 new file mode 100644
-index 00000000..05b47142
+index 0000000..c18cf8e
 --- /dev/null
 +++ b/app/src/main/java/app/grapheneos/camera/remote/WatchRemote.kt
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,205 @@
 +package app.grapheneos.camera.remote
 +
 +import android.app.BroadcastOptions
@@ -162,11 +162,10 @@ index 00000000..05b47142
 + * trusted only when all of the following hold:
 + *  - the permission it defines is really defined by its package (no permission squatting),
 + *  - the user granted that permission to Camera (runtime permission, doubles as consent),
-+ *  - the receiver requires the sender to hold that permission, and
 + *  - the system reported the broadcast as sent from the bridge package's uid
 + *    (requires the sender to opt in via BroadcastOptions.setShareIdentityEnabled).
-+ * Outgoing status broadcasts are explicit (setPackage), share sender identity, and carry no
-+ * data except a fixed status word, so no other app can observe when the user is taking photos
++ * Outgoing status broadcasts are explicit (setPackage), share sender identity, and carry
++ * camera status and state only, so no other app can observe when the user is taking photos
 + * or recording.
 + */
 +class WatchRemote(
@@ -222,10 +221,9 @@ index 00000000..05b47142
 +                }
 +            }
 +            val filter = IntentFilter(bridge.receiveAction)
-+            // RECEIVER_EXPORTED is required to hear another app; the broadcastPermission
-+            // argument is what restricts senders to holders of the bridge permission.
++            // The permission is granted to Camera. handle() verifies the companion sender UID.
 +            ContextCompat.registerReceiver(
-+                context, receiver, filter, bridge.permission, null,
++                context, receiver, filter,
 +                ContextCompat.RECEIVER_EXPORTED,
 +            )
 +            receivers.add(receiver)
@@ -285,16 +283,14 @@ index 00000000..05b47142
 +            if (!payload.isNullOrEmpty()) {
 +                intent.putExtra(EXTRA_PAYLOAD, payload)
 +            }
-+            // The receiver permission makes the system deliver only to the bridge app,
-+            // and only if it holds the permission it defined itself. Share identity so the
-+            // bridge can verify we are Camera via BroadcastReceiver.sentFromUid.
++            // setPackage targets the companion. Share Camera’s UID for its receiver check.
 +            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
 +                val options = BroadcastOptions.makeBasic()
 +                    .setShareIdentityEnabled(true)
 +                    .toBundle()
-+                context.sendBroadcast(intent, bridge.permission, options)
++                context.sendBroadcast(intent, null, options)
 +            } else {
-+                context.sendBroadcast(intent, bridge.permission)
++                context.sendBroadcast(intent)
 +            }
 +        }
 +    }
