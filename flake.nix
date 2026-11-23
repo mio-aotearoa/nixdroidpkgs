@@ -190,16 +190,19 @@
               */
             ];
           };
-          nixpkgs =
-            (import "${nixpkgsSrc}/flake.nix").outputs (
-              inputs.nixpkgs.inputs
+          nixpkgs = inputs.nixpkgs;
+          /*
+            nixpkgs =
+              (import "${nixpkgsSrc}/flake.nix").outputs (
+                inputs.nixpkgs.inputs
+                // {
+                  self = nixpkgs;
+                }
+              )
               // {
-                self = nixpkgs;
-              }
-            )
-            // {
-              inherit (nixpkgsSrc) outPath;
-            };
+                inherit (nixpkgsSrc) outPath;
+              };
+          */
           pkgsPatched = import nixpkgs {
             config = pkgs.config // {
               allowUnfree = true;
