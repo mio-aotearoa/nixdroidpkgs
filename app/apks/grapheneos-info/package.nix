@@ -24,7 +24,7 @@ let
 
   gradle = gradle_9_6_1;
 
-  appPackage = buildGradlePackage rec {
+  appPackage = buildGradlePackage {
     pname = "grapheneos-info";
     version = sources.grapheneos_info.date;
     inherit (sources.grapheneos_info)

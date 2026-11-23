@@ -324,7 +324,7 @@ let
     '';
   };
 
-  appPackage = buildGradlePackage rec {
+  appPackage = buildGradlePackage {
     pname = "tailsocks";
     inherit src version;
     inherit gradle;

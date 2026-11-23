@@ -29,13 +29,12 @@ let
       ]);
 
       gradle = gradle_9_5_1;
-    in
-    buildGradlePackage rec {
+
       pname = "pdfviewer";
-      inherit (sources.grapheneos_pdfviewer)
-        src
-        version
-        ;
+      inherit (sources.grapheneos_pdfviewer) src version;
+    in
+    buildGradlePackage {
+      inherit pname src version;
 
       inherit gradle;
 

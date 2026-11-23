@@ -40,7 +40,7 @@ let
 
   gradle = gradle_9_7_0;
 
-  appPackage = buildGradlePackage rec {
+  appPackage = buildGradlePackage {
     pname = "sunup";
     inherit version src gradle;
 

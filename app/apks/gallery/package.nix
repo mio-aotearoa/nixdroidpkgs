@@ -124,7 +124,7 @@ let
         ' > "$out"
       '';
 
-  appPackage = buildGradlePackage rec {
+  appPackage = buildGradlePackage {
     pname = "gallery";
     inherit version src gradle;
 

@@ -22,7 +22,7 @@ let
 
   gradle = gradle_9_4_1;
 
-  appPackage = buildGradlePackage rec {
+  appPackage = buildGradlePackage {
     pname = "glimpse";
     inherit (sources.lineage_glimpse)
       src

@@ -196,7 +196,7 @@ let
     rustTarget = "armv7-linux-androideabi";
   };
 in
-buildGradlePackage rec {
+buildGradlePackage {
   pname = "forkgram";
   inherit version src;
 

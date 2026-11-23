@@ -144,7 +144,17 @@ in
         makeWrapper ${lib.getExe jre_headless} "$out/bin/lspatch" --add-flags -jar --add-flags "${common}/lspatch.jar"
       '';
 
-  manager = runCommand "lspatch-manager-${version}" { } ''
-    install -Dm644 "${common}/lspatch-manager.apk" "$out/lspatch-manager.apk"
-  '';
+  manager =
+    runCommand "lspatch-manager-${version}"
+      {
+        meta = with lib; {
+          description = "LSPatch manager app";
+          homepage = "https://github.com/JingMatrix/LSPatch";
+          license = licenses.gpl3Only;
+          platforms = platforms.unix;
+        };
+      }
+      ''
+        install -Dm644 "${common}/lspatch-manager.apk" "$out/lspatch-manager.apk"
+      '';
 }

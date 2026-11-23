@@ -31,7 +31,7 @@ let
 
   gradle = gradle_9_6_1;
 
-  appPackage = buildGradlePackage rec {
+  appPackage = buildGradlePackage {
     pname = "grapheneos-camera";
     inherit version src gradle;
 

@@ -53,7 +53,7 @@ let
     s.cmake-3-22-1
   ]);
   gradle = gradle_9_4_1;
-  appPackage = buildGradlePackage rec {
+  appPackage = buildGradlePackage {
     pname = "droidvm";
     inherit version src gradle;
     sourceRoot = "${src.name}";

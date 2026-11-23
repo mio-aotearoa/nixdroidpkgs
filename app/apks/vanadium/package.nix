@@ -11,10 +11,20 @@ let
     version = sources.grapheneos_vanadium.date;
     src = sources.grapheneos_vanadium.src;
     dontUnpack = true;
+
     installPhase = ''
-      mkdir -p $out
-      cp $src/prebuilt/arm64/VanadiumBrowser.apk $out/VanadiumBrowser.apk
+      runHook preInstall
+      install -Dm644 $src/prebuilt/arm64/VanadiumBrowser.apk $out/VanadiumBrowser.apk
+      runHook postInstall
     '';
+
+    meta = {
+      description = "Privacy and security focused Chromium-based browser from GrapheneOS";
+      homepage = "https://github.com/GrapheneOS/Vanadium";
+      license = lib.licenses.bsd3;
+      sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];
+      platforms = lib.platforms.unix;
+    };
   };
 in
 mk-apk-package {

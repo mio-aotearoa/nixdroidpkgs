@@ -27,7 +27,7 @@ let
 
   gradle = gradle_9_1_0;
 
-  appPackage = buildGradlePackage rec {
+  appPackage = buildGradlePackage {
     pname = "recorder";
     inherit version src gradle;
 
