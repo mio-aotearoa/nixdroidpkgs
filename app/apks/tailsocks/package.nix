@@ -38,22 +38,22 @@ let
 
   gradle = gradle_9_2_1;
 
-  version = "6.2.0";
+  version = "6.3.2";
   src = fetchFromGitHub {
     owner = "bropines";
     repo = "tailsocks";
     name = "tailsocks-${version}-source";
     tag = "v${version}";
-    hash = "sha256-UfxaRuIulfkMpPtXaVMQ1iGu/uGqtb7xnb9QxLSRBN4=";
+    hash = "sha256-0aV9vvF7lrcG+adJcD78Mke+5LQV+3FXNlDqwTTitls=";
   };
 
   tailscaleVersion = "1.104.5";
   # git rev-parse v1.104.5^{}
   tailscaleCommit = "73a48057aaf5f60e4f770b398e9b7af576b01dbe";
-  # git rev-parse v6.1.0^{}
-  appCommit = "22b10b7a501e69fbf4ecd8f13235d5239b1eaeb2";
-  # TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d_%H%M%S v6.1.0^{}
-  appCommitTime = "20261119_074108";
+  # git rev-parse v6.3.2^{}
+  appCommit = "a3696d053c724655ba93dd81e9878b1421aca431";
+  # TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d_%H%M%S v6.3.2^{}
+  appCommitTime = "20261123_212033";
 
   tailscaleSrc = fetchFromGitHub {
     owner = "tailscale";
@@ -352,10 +352,17 @@ let
 
         . "${../_shared/update-script-helpers.sh}"
 
+        old_version="$(sed -n 's/^[[:space:]]*version = "\([^"]*\)";/\1/p' "$package_file" | head -n 1)"
+
         ${lib.getExe nix-update} --flake --src-only apk_tailsocks
 
         new_version="$(sed -n 's/^[[:space:]]*version = "\([^"]*\)";/\1/p' "$package_file" | head -n 1)"
         tag="v$new_version"
+
+        # Keep the git command comments above appCommit/appCommitTime accurate.
+        replace_literal "# git rev-parse v$old_version^{}" "# git rev-parse v$new_version^{}"
+        replace_literal "# TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d_%H%M%S v$old_version^{}" \
+          "# TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d_%H%M%S v$new_version^{}"
         src="$(nix build .#apk_tailsocks.src --no-link --print-out-paths)"
 
         auth_header=()
