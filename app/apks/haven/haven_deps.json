@@ -2306,6 +2306,9 @@
    "jar": "sha256-oTtziWVUtI5L702KRjDqfpQBSaxMrcysBpFGORRlSeo=",
    "pom": "sha256-724nWZiUO5b1imSWQIUyDxAxdNYJ7GakqUnmASPHmPU="
   },
+  "org/jetbrains/kotlin/android#org.jetbrains.kotlin.android.gradle.plugin/2.4.21": {
+   "pom": "sha256-wwTbnqGqOlKxqDQgOwYHg9u6IOklbklKomNdQ5O9yxA="
+  },
   "org/jetbrains/kotlin/jvm#org.jetbrains.kotlin.jvm.gradle.plugin/2.0.21": {
    "pom": "sha256-Jk8V5sp1XIU/oPWvEPa9GgHwmLKsDPmOHP05kBF/tjo="
   },
@@ -3890,9 +3893,6 @@
   "org/jetbrains/kotlin#kotlin-util-klib/2.4.21": {
    "jar": "sha256-8B951UlolB36g6Ulrhc76TRgu4WwvyzJ/wb26whkaR4=",
    "pom": "sha256-l7WUld6Sx4nGlj5OcNVUXOzNLw+rZ9fOcvfFqHuUgDA="
-  },
-  "org/jetbrains/kotlin/android#org.jetbrains.kotlin.android.gradle.plugin/2.4.21": {
-   "pom": "sha256-5qV+Y+xcVLfzYTvCeXJ61LsIrBPTRZG2SkVEG2+ubGs="
   },
   "org/jetbrains/kotlin/jvm#org.jetbrains.kotlin.jvm.gradle.plugin/2.3.0": {
    "pom": "sha256-uQxEPUKbbQ2lkoBwp73Z3PFDQMs6qcoAMS7WbP0L15M="

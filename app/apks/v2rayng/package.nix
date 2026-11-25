@@ -25,6 +25,7 @@ let
         s.platform-tools
         s.platforms-android-36
         s.platforms-android-37-0
+        s.platforms-android-37-1
         s.build-tools-36-0-0
         s.build-tools-37-0-0
         s.ndk-28-2-13676358
@@ -177,14 +178,14 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "v2rayng";
-      version = "2.4.0";
+      version = "2.4.1";
 
       src = fetchFromGitHub {
         owner = "2dust";
         repo = "v2rayNG";
         tag = finalAttrs.version;
         fetchSubmodules = true;
-        hash = "sha256-/dcic0db3+eS0rbsx1A8mCXNpaefK8sewoUWkkSies0=";
+        hash = "sha256-RvMgYcWJCH2He/+BeAYOktKS4mi8mUseCyYvRfb2Q78=";
       };
 
       sourceRoot = "${finalAttrs.src.name}/V2rayNG";
