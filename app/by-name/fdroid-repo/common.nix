@@ -54,6 +54,9 @@ let
     # need to update golang hash for darwin:
 
     # need to update npm lock for darwin:
+    # electerm's node_modules trees are fixed-output derivations, so the
+    # platform-specific npm binaries need darwin hashes first
+    "electerm"
 
     # cannot build on darwin due to nixpkgs didn't package android toolchain for darwin aarch64
     "kernelsu"
