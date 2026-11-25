@@ -41,7 +41,7 @@ let
 
       # Upstream tag; Android versionName / nix version append +<patchVersion>.
       upstreamVersion = "2026.11.1";
-      patchVersion = "p2";
+      patchVersion = "p3";
       version = "${upstreamVersion}+${patchVersion}";
     in
     buildGradlePackage {
