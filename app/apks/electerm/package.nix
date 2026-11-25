@@ -174,7 +174,11 @@ let
 
     # Everything up to the native project happens here, not in buildPhase, so
     # the Gradle dependency update script (configurePhase + gradleUpdateScript)
-    # sees the same prepared tree.
+    # sees the same prepared tree. The script below re-implements the tree that
+    # build/bin/install.js would produce
+    # (https://github.com/electerm/electerm-android/blob/main/build/bin/install.js,
+    # electerm, MIT); it is not run because it shells out to git and follows
+    # electerm-web's default branch over the network.
     postPatch = ''
       cp -a ${nodeModules}/node_modules .
       cp -a ${androidNodeModules}/node_modules build/android/node_modules
