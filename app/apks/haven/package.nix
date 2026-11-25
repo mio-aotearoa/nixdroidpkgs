@@ -543,7 +543,7 @@ let
     in
     {
       pname = "haven";
-      version = "5.94.66";
+      version = "5.94.72";
 
       __darwinAllowLocalNetworking = true;
       __noChroot = stdenv.hostPlatform.isDarwin;
@@ -554,7 +554,7 @@ let
         name = "haven-${finalAttrs0.version}-source";
         tag = "v${finalAttrs0.version}";
         fetchSubmodules = true;
-        hash = "sha256-+o0/N2lpR2VmzKL71lER4gzpWRwmXo3omkkP4etp1EI=";
+        hash = "sha256-ASX68+//Mx+KS2c0hanJdD/bKCTeTfdFaBxvWmrH3N4=";
       };
 
       patches = [

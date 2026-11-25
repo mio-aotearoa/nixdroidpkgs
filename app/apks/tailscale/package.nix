@@ -15,24 +15,26 @@
   cacert,
   patch,
   git,
+  writeShellScriptBin,
+  nix-update,
 }:
 let
   appPackage =
     let
-      version = "1.105.79-t47743a8b9-g37df07647";
+      version = "1.106.1-t344347192-g0a7686abf";
 
       src = fetchFromGitHub {
         owner = "tailscale";
         repo = "tailscale-android";
         tag = version;
-        hash = "sha256-ZehhtVqiNiFG9yTej8fuezTybwV3eyxSkiVWzcM8x1c=";
+        hash = "sha256-WD1AaHNPlnWlfJGNSqcX4qSDzkqFBt+Znizloc3Njeo=";
       };
 
       tailscaleSrc = fetchFromGitHub {
         owner = "tailscale";
         repo = "tailscale";
-        rev = "47743a8b9ad1";
-        hash = "sha256-ptuZzEmJHCG6P9VHBQqtPfkrUVUC1JoS1a0r3huQu24=";
+        rev = "ca97d565daae99bf53b1f45f28c36ee081a14f04";
+        hash = "sha256-8foZfH4jeJR0z/bLIdufsADIUnt+DSyXL9tjjyg8L9Q=";
       };
 
       xMobileSrc = fetchFromGitHub {
@@ -58,7 +60,7 @@ let
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
         # Update hash to trigger rebuild with internet access
-        outputHash = "sha256-KZE+dmdg/3TW51rm94qMLqStXMUW9RAVqjiv/AWsbow=";
+        outputHash = "sha256-CrmcKzGbl9r1buTfuPhUhdWDRQZtyweyPUAEFZvDsqo=";
 
         dontConfigure = true;
         dontFixup = true;
@@ -80,11 +82,11 @@ let
           cd source
 
           # Aggressively patch go.mod files to use the available go version
-          find . -name "go.mod" -execdir go mod edit -go=1.27.1 -toolchain=none {} \;
+          find . -name "go.mod" -execdir go mod edit -go=${go_1_27.version} -toolchain=none {} \;
 
           cp -R ${tailscaleSrc} tailscale-module
           chmod -R u+w tailscale-module
-          go mod edit -go=1.27.1 -toolchain=none tailscale-module/go.mod
+          go mod edit -go=${go_1_27.version} -toolchain=none tailscale-module/go.mod
           go mod edit -replace=tailscale.com=./tailscale-module
 
           cp -R ${xMobileSrc} x-mobile
@@ -108,8 +110,10 @@ let
       androidSdk = androidSdkBuilder (s: [
         s.cmdline-tools-latest
         s.platform-tools
+        s.platforms-android-37-0
         s.platforms-android-36
         s.platforms-android-34
+        s.build-tools-37-0-0
         s.build-tools-36-0-0
         s.build-tools-34-0-0
         s.ndk-27-3-13750724
@@ -122,7 +126,80 @@ let
       inherit version src;
 
       passthru = {
-        inherit goModCache;
+        inherit goModCache tailscaleSrc xMobileSrc;
+
+        # The Go module cache covers this source tree's go.mod, so it has to be
+        # refreshed whenever a new release changes the module graph.
+        updateDeps = [ "goModCache" ];
+
+        updateScript = writeShellScriptBin "update-tailscale" ''
+          set -euo pipefail
+          package_file="app/apks/tailscale/package.nix"
+          package_attr=".#apk_tailscale"
+          fake_hash="${lib.fakeHash}"
+
+          . "${../_shared/update-script-helpers.sh}"
+
+          ${lib.getExe nix-update} --flake --src-only apk_tailscale
+
+          src="$(nix build .#apk_tailscale.src --no-link --print-out-paths)"
+
+          # tailscale-android's go.mod pins the tailscale.com module. Stable
+          # builds pin a release tag; unstable builds a pseudo-version whose
+          # last segment is the commit.
+          ts_ref="$(sed -n 's/^[[:space:]]*tailscale\.com \([^[:space:]]*\)$/\1/p' "$src/go.mod" | head -n 1)"
+          [[ -n "$ts_ref" ]] || {
+            echo "error: no tailscale.com require line in $src/go.mod" >&2
+            exit 1
+          }
+
+          if [[ "$ts_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            # Annotated tags point at a tag object; use its peeled commit.
+            tag_refs="$(${lib.getExe git} ls-remote --tags https://github.com/tailscale/tailscale.git "refs/tags/$ts_ref" "refs/tags/$ts_ref^{}")"
+            ts_rev="$(awk -v ref="refs/tags/$ts_ref^{}" '$2 == ref { print $1 }' <<<"$tag_refs")"
+            [[ -n "$ts_rev" ]] || ts_rev="$(awk -v ref="refs/tags/$ts_ref" '$2 == ref { print $1 }' <<<"$tag_refs")"
+          else
+            ts_rev="$(sed -n 's/.*-\([0-9a-f]\{12\}\)$/\1/p' <<<"$ts_ref")"
+          fi
+          [[ -n "$ts_rev" ]] || {
+            echo "error: could not resolve tailscale.com $ts_ref to a commit" >&2
+            exit 1
+          }
+
+          block_rev() {
+            awk -v block="$1 = fetchFromGitHub {" '
+              index($0, block) { f = 1 }
+              f && /rev = "/ {
+                split($0, fields, "\"")
+                print fields[2]
+                exit
+              }
+            ' "$package_file"
+          }
+
+          old_ts_rev="$(block_rev tailscaleSrc)"
+          if [[ "$ts_rev" != "$old_ts_rev" ]]; then
+            replace_literal "rev = \"$old_ts_rev\";" "rev = \"$ts_rev\";"
+            refresh_fod_hash tailscaleSrc
+          else
+            echo "  tailscaleSrc: unchanged"
+          fi
+
+          xm_ref="$(sed -n 's/^[[:space:]]*golang\.org\/x\/mobile \([^[:space:]]*\)$/\1/p' "$src/go.mod" | head -n 1)"
+          xm_rev="$(sed -n 's/.*-\([0-9a-f]\{12\}\)$/\1/p' <<<"$xm_ref")"
+          if [[ -n "$xm_rev" ]]; then
+            old_xm_rev="$(block_rev xMobileSrc)"
+            if [[ "$xm_rev" != "$old_xm_rev" ]]; then
+              replace_literal "rev = \"$old_xm_rev\";" "rev = \"$xm_rev\";"
+              refresh_fod_hash xMobileSrc
+            else
+              echo "  xMobileSrc: unchanged"
+            fi
+          fi
+
+          refresh_update_deps ${lib.concatStringsSep " " finalAttrs.passthru.updateDeps}
+          refresh_mitm_cache
+        '';
       };
 
       gradleBuildTask = "assembleRelease";
@@ -155,7 +232,7 @@ let
         ANDROID_SDK_ROOT = "${androidSdk}/share/android-sdk";
         ANDROID_NDK_ROOT = "${androidSdk}/share/android-sdk/ndk/27.3.13750724";
         NDK_ROOT = "${androidSdk}/share/android-sdk/ndk/27.3.13750724";
-        ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = "${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2";
+        ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
       };
 
       preBuild = ''
@@ -177,16 +254,16 @@ let
         export GOTOOLCHAIN=local
 
         # Aggressively patch go.mod files to use the available go version
-        find . -name "go.mod" -execdir go mod edit -go=1.27.1 -toolchain=none {} \;
+        find . -name "go.mod" -execdir go mod edit -go=${go_1_27.version} -toolchain=none {} \;
 
         find "$GOMODCACHE" -name go.mod -print | while read -r gomod; do
           chmod u+w "$(dirname "$gomod")" "$gomod"
-          go mod edit -go=1.27.1 -toolchain=none "$gomod"
+          go mod edit -go=${go_1_27.version} -toolchain=none "$gomod"
         done
 
         cp -R ${tailscaleSrc} tailscale-module
         chmod -R u+w tailscale-module
-        go mod edit -go=1.27.1 -toolchain=none tailscale-module/go.mod
+        go mod edit -go=${go_1_27.version} -toolchain=none tailscale-module/go.mod
         go mod edit -replace=tailscale.com=./tailscale-module
 
         cp -R ${xMobileSrc} x-mobile
@@ -239,8 +316,8 @@ let
         org.gradle.jvmargs=-Xmx4096m -Duser.home=$HOME -Dandroid.user.home=$HOME/.android
         systemProp.user.home=$HOME
         systemProp.android.user.home=$HOME/.android
-        android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2
-        org.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2
+        android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2
+        org.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2
         EOF
 
         make env
@@ -256,8 +333,8 @@ let
         "android"
         "-Dorg.gradle.java.installations.auto-download=false"
         "-Dorg.gradle.java.installations.paths=${finalAttrs.env.JAVA_HOME}"
-        "-Dandroid.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2"
-        "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2"
+        "-Dandroid.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2"
+        "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2"
       ];
 
       installPhase = ''

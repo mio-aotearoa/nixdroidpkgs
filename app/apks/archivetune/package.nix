@@ -30,14 +30,14 @@ let
 
   appPackage = stdenv.mkDerivation (finalAttrs: {
     pname = "archivetune";
-    version = "16.0.0";
+    version = "16.1.0";
 
     src = fetchFromGitHub {
       owner = "koiverse";
       repo = "ArchiveTune";
       tag = "v${finalAttrs.version}";
       fetchSubmodules = true;
-      hash = "sha256-9U0O7L3mnazsbQyafcrG+32N8ArlI1fobanV/FKL0ug=";
+      hash = "sha256-PZMi8iuJGH4zNBck9fM+X7tBAz2aZcEIA+CSodRp+n4=";
     };
 
     patches = [
@@ -110,6 +110,10 @@ let
         --replace-fail "compileSdkMinor = 2" "compileSdkMinor = 0" \
         --replace-fail "ndkVersion = \"30.0.16248370\"" "ndkVersion = \"30.0.15729638\"" \
         --replace-warn "buildConfigField(\"boolean\", \"UPDATER_AVAILABLE\", \"true\")" "buildConfigField(\"boolean\", \"UPDATER_AVAILABLE\", \"false\")"
+
+      # The AboutLibraries plugin queries api.github.com at build time unless
+      # offline mode is enabled; that response is not reproducible.
+      printf '\naboutLibraries { offlineMode = true }\n' >> app/build.gradle.kts
     '';
 
     preConfigure = ''

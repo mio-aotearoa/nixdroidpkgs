@@ -10,6 +10,9 @@
   runCommand,
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
+  writeShellScriptBin,
+  nix-update,
+  curl,
 }:
 let
   appPackage =
@@ -42,13 +45,13 @@ let
       # Upstream app versionName is 0.29; nix version tracks the unstable rev + our patch train.
       upstreamVersionName = "0.29";
       patchVersion = "p2";
-      version = "0.29-unstable-2026-10-17+${finalAttrs.patchVersion}";
+      version = "0.29-unstable-2026-11-24+${finalAttrs.patchVersion}";
 
       src = fetchFromGitHub {
         owner = "AsteroidOS";
         repo = "AsteroidOSSync";
-        rev = "a6ef3b587a577bdaff006cbd6f0c5a7d88ee763d";
-        hash = "sha256-5cedy20/YBskU3umpO/AGr1E1qsIHACbJAgLnzep45Q=";
+        rev = "e1726d205103e36487a15cffb8dd74e595c310d7";
+        hash = "sha256-J74jQjKft/04G8VgAXsN5Q3GUYTZf8bx4tNE/ObBMj0=";
       };
 
       patches = [
@@ -174,6 +177,31 @@ let
         fi
       '';
 
+      passthru.updateScript = writeShellScriptBin "update-asteroidos-sync" ''
+        set -euo pipefail
+        package_file="app/apks/asteroidos-sync/package.nix"
+        package_attr=".#apk_asteroidos-sync"
+        fake_hash="${lib.fakeHash}"
+
+        . "${../_shared/update-script-helpers.sh}"
+
+        ${lib.getExe nix-update} --flake --version=branch --src-only apk_asteroidos-sync
+
+        # `nix-update` cannot rewrite the interpolated version string, so bump
+        # its unstable date from the newest commit on the default branch.
+        date="$(${lib.getExe curl} -fsSL \
+          https://github.com/AsteroidOS/AsteroidOSSync/commits/HEAD.atom \
+          | sed -n 's/.*<updated>\([0-9-]*\)T.*/\1/p' | head -n 1)"
+        old_date="$(sed -n 's/^[[:space:]]*version = ".*unstable-\([0-9-]*\)+.*$/\1/p' "$package_file" | head -n 1)"
+        [[ -n "$date" && -n "$old_date" ]] || {
+          echo "error: could not determine the unstable date" >&2
+          exit 1
+        }
+        replace_literal "unstable-$old_date" "unstable-$date"
+
+        refresh_mitm_cache
+      '';
+
       gradleFlags = [
         "-xlintVitalRelease"
         "--no-daemon"
@@ -186,15 +214,7 @@ let
 
       installPhase = ''
         runHook preInstall
-        apk_path=""
-        for candidate in \
-          app/build/outputs/apk/release/app-release-unsigned.apk \
-          app/build/outputs/apk/release/app-release.apk; do
-          if [ -f "$candidate" ]; then
-            apk_path="$candidate"
-            break
-          fi
-        done
+        apk_path="$(find app/build/outputs/apk/release -maxdepth 1 -name 'app-release*.apk' -print -quit)"
         test -n "$apk_path"
         install -Dm644 "$apk_path" "$out/asteroidos-sync.apk"
         runHook postInstall

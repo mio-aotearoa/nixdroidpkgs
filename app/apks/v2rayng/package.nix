@@ -25,12 +25,14 @@ let
         s.platform-tools
         s.platforms-android-36
         s.platforms-android-37-0
+        s.platforms-android-37-1
         s.build-tools-36-0-0
         s.build-tools-37-0-0
         s.ndk-28-2-13676358
       ]);
 
       gradle = gradle_9_7_1;
+      aapt2Path = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
 
       # git ls-tree 2.3.13 AndroidLibXrayLite
       xrayLiteVersion = "b5a377087e74eaa34e86718710b04c50f4b767f5";
@@ -177,14 +179,14 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       pname = "v2rayng";
-      version = "2.4.0";
+      version = "2.4.1";
 
       src = fetchFromGitHub {
         owner = "2dust";
         repo = "v2rayNG";
         tag = finalAttrs.version;
         fetchSubmodules = true;
-        hash = "sha256-/dcic0db3+eS0rbsx1A8mCXNpaefK8sewoUWkkSies0=";
+        hash = "sha256-RvMgYcWJCH2He/+BeAYOktKS4mi8mUseCyYvRfb2Q78=";
       };
 
       sourceRoot = "${finalAttrs.src.name}/V2rayNG";
@@ -244,16 +246,12 @@ let
         writableTmpDirAsHomeHook
       ];
 
-      env =
-        let
-          aapt2Path = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
-        in
-        {
-          JAVA_HOME = jdk25_headless;
-          ANDROID_HOME = "${androidSdk}/share/android-sdk";
-          ANDROID_SDK_ROOT = "${androidSdk}/share/android-sdk";
-          ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = aapt2Path;
-        };
+      env = {
+        JAVA_HOME = jdk25_headless;
+        ANDROID_HOME = "${androidSdk}/share/android-sdk";
+        ANDROID_SDK_ROOT = "${androidSdk}/share/android-sdk";
+        ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = aapt2Path;
+      };
 
       preConfigure = ''
         export ANDROID_USER_HOME="$HOME/.android"
@@ -274,16 +272,12 @@ let
         ];
       };
 
-      gradleFlags =
-        let
-          aapt2Path = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
-        in
-        [
-          "-Dorg.gradle.java.installations.auto-download=false"
-          "-Dorg.gradle.java.installations.paths=${jdk25_headless}"
-          "-Dandroid.aapt2FromMavenOverride=${aapt2Path}"
-          "-Dorg.gradle.project.android.aapt2FromMavenOverride=${aapt2Path}"
-        ];
+      gradleFlags = [
+        "-Dorg.gradle.java.installations.auto-download=false"
+        "-Dorg.gradle.java.installations.paths=${jdk25_headless}"
+        "-Dandroid.aapt2FromMavenOverride=${aapt2Path}"
+        "-Dorg.gradle.project.android.aapt2FromMavenOverride=${aapt2Path}"
+      ];
 
       installPhase = ''
         runHook preInstall
