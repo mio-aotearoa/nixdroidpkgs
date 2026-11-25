@@ -192,10 +192,12 @@ let
         date="$(${lib.getExe curl} -fsSL \
           https://github.com/AsteroidOS/AsteroidOSSync/commits/HEAD.atom \
           | sed -n 's/.*<updated>\([0-9-]*\)T.*/\1/p' | head -n 1)"
-        [[ -n "$date" ]] || { echo "error: could not determine the newest commit date" >&2; exit 1; }
-        old_version="$(sed -n 's/^[[:space:]]*version = "\(.*\)";$/\1/p' "$package_file" | head -n 1)"
-        new_version="$(sed "s/unstable-[0-9][0-9-]*/unstable-$date/" <<<"$old_version")"
-        replace_literal "version = \"$old_version\";" "version = \"$new_version\";"
+        old_date="$(sed -n 's/^[[:space:]]*version = ".*unstable-\([0-9-]*\)+.*$/\1/p' "$package_file" | head -n 1)"
+        [[ -n "$date" && -n "$old_date" ]] || {
+          echo "error: could not determine the unstable date" >&2
+          exit 1
+        }
+        replace_literal "unstable-$old_date" "unstable-$date"
 
         refresh_mitm_cache
       '';
@@ -212,15 +214,7 @@ let
 
       installPhase = ''
         runHook preInstall
-        apk_path=""
-        for candidate in \
-          app/build/outputs/apk/release/app-release-unsigned.apk \
-          app/build/outputs/apk/release/app-release.apk; do
-          if [ -f "$candidate" ]; then
-            apk_path="$candidate"
-            break
-          fi
-        done
+        apk_path="$(find app/build/outputs/apk/release -maxdepth 1 -name 'app-release*.apk' -print -quit)"
         test -n "$apk_path"
         install -Dm644 "$apk_path" "$out/asteroidos-sync.apk"
         runHook postInstall

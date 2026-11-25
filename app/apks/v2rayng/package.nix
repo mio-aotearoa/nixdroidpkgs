@@ -32,6 +32,7 @@ let
       ]);
 
       gradle = gradle_9_7_1;
+      aapt2Path = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
 
       # git ls-tree 2.3.13 AndroidLibXrayLite
       xrayLiteVersion = "b5a377087e74eaa34e86718710b04c50f4b767f5";
@@ -245,16 +246,12 @@ let
         writableTmpDirAsHomeHook
       ];
 
-      env =
-        let
-          aapt2Path = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
-        in
-        {
-          JAVA_HOME = jdk25_headless;
-          ANDROID_HOME = "${androidSdk}/share/android-sdk";
-          ANDROID_SDK_ROOT = "${androidSdk}/share/android-sdk";
-          ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = aapt2Path;
-        };
+      env = {
+        JAVA_HOME = jdk25_headless;
+        ANDROID_HOME = "${androidSdk}/share/android-sdk";
+        ANDROID_SDK_ROOT = "${androidSdk}/share/android-sdk";
+        ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = aapt2Path;
+      };
 
       preConfigure = ''
         export ANDROID_USER_HOME="$HOME/.android"
@@ -275,16 +272,12 @@ let
         ];
       };
 
-      gradleFlags =
-        let
-          aapt2Path = "${androidSdk}/share/android-sdk/build-tools/37.0.0/aapt2";
-        in
-        [
-          "-Dorg.gradle.java.installations.auto-download=false"
-          "-Dorg.gradle.java.installations.paths=${jdk25_headless}"
-          "-Dandroid.aapt2FromMavenOverride=${aapt2Path}"
-          "-Dorg.gradle.project.android.aapt2FromMavenOverride=${aapt2Path}"
-        ];
+      gradleFlags = [
+        "-Dorg.gradle.java.installations.auto-download=false"
+        "-Dorg.gradle.java.installations.paths=${jdk25_headless}"
+        "-Dandroid.aapt2FromMavenOverride=${aapt2Path}"
+        "-Dorg.gradle.project.android.aapt2FromMavenOverride=${aapt2Path}"
+      ];
 
       installPhase = ''
         runHook preInstall
