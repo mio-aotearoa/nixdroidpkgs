@@ -37,10 +37,13 @@ let
     s.cmake-3-22-1
   ]);
 
+  androidHome = "${androidSdk}/share/android-sdk";
+  ndkVersion = "27.0.12077973";
+
   # https://github.com/electerm/electerm-android/blob/v5.15.1/build/android/android/gradle/wrapper/gradle-wrapper.properties
   gradle = gradle_8_14_3;
 
-  aapt2Path = "${androidSdk}/share/android-sdk/build-tools/36.0.0/aapt2";
+  aapt2Path = "${androidHome}/build-tools/36.0.0/aapt2";
 
   # The Android repo does not vendor the backend: `build/bin/install.js`
   # resolves the tip of electerm-web's default branch on every install and
@@ -102,8 +105,7 @@ let
   androidNodeModules =
     installNodeModules "electerm-${version}-android-node-modules" "${src}/build/android"
       "sha256-OQpfNtFdCsTQh0nZexe2T2o+woOyYHquZEqKTDJ46Yk=";
-in
-let
+
   appPackage = stdenv.mkDerivation (finalAttrs: {
     pname = "electerm";
     inherit version src;
@@ -163,9 +165,9 @@ let
 
     env = {
       JAVA_HOME = jdk21_headless.passthru.home;
-      ANDROID_HOME = "${androidSdk}/share/android-sdk";
-      ANDROID_SDK_ROOT = "${androidSdk}/share/android-sdk";
-      ANDROID_NDK_HOME = "${androidSdk}/share/android-sdk/ndk/27.0.12077973";
+      ANDROID_HOME = androidHome;
+      ANDROID_SDK_ROOT = androidHome;
+      ANDROID_NDK_HOME = "${androidHome}/ndk/${ndkVersion}";
       # The aapt2 pulled from Maven at build time cannot start in the sandbox.
       ANDROID_AAPT2_FROM_MAVEN_OVERRIDE = aapt2Path;
     };
@@ -235,7 +237,7 @@ let
             --replace-fail \
               '    compileSdk = rootProject.ext.compileSdkVersion' \
               '    compileSdk = rootProject.ext.compileSdkVersion
-        ndkVersion "27.0.12077973"'
+        ndkVersion "${ndkVersion}"'
           printf '\next.nodejsMobileAndroidUrl = "file://%s"\n' "${nodejsMobileAndroid}" \
             >> android/variables.gradle
         )
