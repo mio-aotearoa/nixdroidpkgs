@@ -1,0 +1,12 @@
+diff --git a/ios/Podfile b/ios/Podfile
+index 96b18fe..32278e6 100644
+--- a/ios/Podfile
++++ b/ios/Podfile
+@@ -37,6 +37,7 @@ target 'Runner' do
+   # (lib/vox/aeic_hd_ios_ffi.dart); CI builds it into
+   # third_party/aeic_hd/ios/lib/ with tool/build_aeic_hd_ios.sh.
+   pod 'aeic_hd', :path => '../third_party/aeic_hd'
++  pod 'onnxruntime-objc', :path => '../third_party/onnxruntime-objc'
+ 
+   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+ end

@@ -23,6 +23,7 @@
 let
   flutterApkHelpers = ../_shared/flutter-apk-helpers.sh;
   mkFlutterSdkSourceBuilder = import ../_shared/mk-flutter-sdk-source-builder.nix;
+  meshcoreCommon = import ./common.nix { inherit fetchFromGitHub; };
 
   appPackage =
     let
@@ -63,14 +64,6 @@ let
         repo = "AEIC";
         rev = "b00795ca709354f987e868f6b9e608961ec80831";
         hash = "sha256-g+g4bQvk52xa2bt6dPvVOyUGOqfTO1Cr8ocFv1eA3/E=";
-      };
-
-      meshcoreSource = fetchFromGitHub {
-        owner = "jade-on-mesh";
-        repo = "meshcore-open-tak";
-        # latest-build is a moving tag; pin the release commit for reproducibility.
-        rev = "59d58b439c86b7f77eda8fd37e9c6f5be61d7148";
-        hash = "sha256-8uHtcjZKL3D25ADpmUpfN4MMbgXHGL/9Kp9LxrB+VNA=";
       };
 
       androidSdk = androidSdkBuilder (s: [
@@ -154,17 +147,15 @@ let
     in
     buildDartApplication.override { dart = flutter347; } (finalAttrs: {
       pname = "meshcore-open";
-      version = "99.0.3+1379";
+      inherit (meshcoreCommon) version;
 
       __darwinAllowLocalNetworking = true;
       __noChroot = stdenv.hostPlatform.isDarwin;
 
-      src = meshcoreSource;
+      inherit (meshcoreCommon) src;
 
       # The TAK fork already removes the node banner.
-      patches = [
-        ./resend-channel-messages.patch
-      ];
+      inherit (meshcoreCommon) patches;
 
       pubspecLock = lib.importJSON ./pubspec.lock.json;
 
