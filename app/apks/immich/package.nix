@@ -147,6 +147,11 @@ let
               ANDROID_NDK_HOME = "${androidSdkRoot}/ndk/29.0.14206865";
             };
 
+            # Rust build scripts run on the Darwin host and link against the
+            # host libiconv, which cross stdenv does not expose automatically.
+            nativeBuildInputs = lib.optional stdenv.hostPlatform.isDarwin crossPkgs.buildPackages.libiconv;
+            NIX_RUSTFLAGS = lib.optionalString stdenv.hostPlatform.isDarwin "-L native=${crossPkgs.buildPackages.libiconv}/lib";
+
             postPatch = ''
               # Nix supplies the toolchain; rustup is unavailable in the sandbox.
               rm -f crates/native_core_ffi/rust-toolchain.toml

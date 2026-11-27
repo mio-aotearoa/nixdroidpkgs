@@ -79,6 +79,10 @@ let
       # nixpkgs defaults to forcing system libs (AWS_LC_SYS_USE_SYSTEM etc.),
       # which cannot be satisfied when cross-compiling for Android.
       dontCargoUseSystemLibs = true;
+      # Rust build scripts run on the Darwin host and link against the host
+      # libiconv, which cross stdenv does not expose automatically.
+      nativeBuildInputs = lib.optional stdenv.hostPlatform.isDarwin crossPkgs.buildPackages.libiconv;
+      NIX_RUSTFLAGS = lib.optionalString stdenv.hostPlatform.isDarwin "-L native=${crossPkgs.buildPackages.libiconv}/lib";
       installPhase = ''
         runHook preInstall
         install -Dm755 target/${rustTarget}/release/libina.so "$out/${abi}/libina.so"

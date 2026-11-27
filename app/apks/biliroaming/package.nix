@@ -1,20 +1,25 @@
 {
   lib,
   stdenv,
+  darwin,
   fetchFromGitHub,
   gradle_8_12,
   androidSdkBuilder,
-  jdk21_headless,
+  jdk17_headless,
   writableTmpDirAsHomeHook,
+  nix-update-script,
 }:
 let
-  version = "unstable-2026-06-18";
+  version = "1.7.0";
 
   androidSdk = androidSdkBuilder (s: [
     s.cmdline-tools-latest
     s.platform-tools
+    s.platforms-android-34
     s.platforms-android-35
+    s.build-tools-34-0-0
     s.build-tools-35-0-0
+    s.ndk-26-0-10792818
     s.ndk-29-0-14206865
     s.cmake-4-1-2
   ]);
@@ -30,8 +35,8 @@ stdenv.mkDerivation (finalAttrs: {
   src = fetchFromGitHub {
     owner = "yujincheng08";
     repo = "BiliRoaming";
-    rev = "7c792dc";
-    hash = "sha256-DqJok2kZHHoE4rhqKRjh4LNcVhS6IOnKAxb2JO3strA=";
+    tag = "v${version}";
+    hash = "sha256-6ragIxkxok5d71+424BVP4MMVlm9M0qYC0KXLu7zX5U=";
     fetchSubmodules = true;
     gitConfigFile = lib.toFile "gitconfig" ''
       [url "https://github.com/"]
@@ -48,10 +53,17 @@ stdenv.mkDerivation (finalAttrs: {
 
   postPatch = ''
     find . -name "*.orig" -delete
+    substituteInPlace \
+      app/src/main/jni/CMakeLists.txt \
+      app/src/main/jni/dex_builder/CMakeLists.txt \
+      --replace-fail 'cmake_minimum_required(VERSION 3.4.1)' 'cmake_minimum_required(VERSION 3.5)'
   '';
 
   gradleBuildTask = ":app:assembleRelease";
   gradleUpdateTask = finalAttrs.gradleBuildTask;
+  passthru.updateScript = nix-update-script { };
+  __darwinAllowLocalNetworking = true;
+  __noChroot = stdenv.hostPlatform.isDarwin;
 
   mitmCache = gradle.fetchDeps {
     inherit (finalAttrs) pname;
@@ -63,12 +75,13 @@ stdenv.mkDerivation (finalAttrs: {
 
   nativeBuildInputs = [
     gradle
-    jdk21_headless
+    jdk17_headless
     writableTmpDirAsHomeHook
-  ];
+  ]
+  ++ lib.optional stdenv.hostPlatform.isDarwin darwin.system_cmds;
 
   env = {
-    JAVA_HOME = jdk21_headless.passthru.home;
+    JAVA_HOME = jdk17_headless.passthru.home;
     ANDROID_HOME = androidSdkRoot;
     ANDROID_SDK_ROOT = androidSdkRoot;
     ANDROID_NDK_ROOT = "${androidSdkRoot}/ndk/29.0.14206865";
@@ -76,9 +89,10 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   preConfigure = ''
+    export HOME="$TMPDIR/home"
     export ANDROID_USER_HOME="$HOME/.android"
-    export GRADLE_USER_HOME="$HOME/.gradle"
-    mkdir -p "$ANDROID_USER_HOME" "$GRADLE_USER_HOME"
+    export GRADLE_USER_HOME="$TMPDIR/gradle-home"
+    mkdir -p "$HOME" "$ANDROID_USER_HOME" "$GRADLE_USER_HOME"
     echo "sdk.dir=${androidSdkRoot}" > local.properties
 
     cat >> gradle.properties <<EOF
@@ -89,7 +103,7 @@ stdenv.mkDerivation (finalAttrs: {
   gradleFlags = [
     "--no-daemon"
     "-Dorg.gradle.java.installations.auto-download=false"
-    "-Dorg.gradle.java.installations.paths=${jdk21_headless.passthru.home}"
+    "-Dorg.gradle.java.installations.paths=${jdk17_headless.passthru.home}"
     "-Dandroid.aapt2FromMavenOverride=${aapt2}"
     "-Dorg.gradle.project.android.aapt2FromMavenOverride=${aapt2}"
   ];

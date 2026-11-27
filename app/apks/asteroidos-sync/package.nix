@@ -58,7 +58,7 @@ let
         ./easyweather-from-source.patch
         (fetchpatch {
           url = "https://github.com/AsteroidOS/AsteroidOSSync/pull/236.diff";
-          hash = "sha256-Rtwcpc19Ask4xXE2JStbsnHWPFqiS/GwNxO9H8oHaPM=";
+          hash = "sha256-8ZQxPB9K6MWjWwOWxXpeOKGEevrgod+9GtFAHKCJ2p8=";
         })
         ./asteroidos-app-bridge.patch
         ./sync-time-default.patch

@@ -61,7 +61,7 @@ let
         ./fix-fossil-hr-build.patch
         (fetchpatch {
           url = "https://codeberg.org/Freeyourgadget/Gadgetbridge/pulls/7419.diff";
-          hash = "sha256-hKnu5Of8614JwBzGqVGgWN0OaP3+I95VSU8Pw75p8Ww=";
+          hash = "sha256-WqflfOaVDbskQHZ/k32hKFv3xdXGOQnUgBOlCaCd+mw=";
         })
         ./asteroidos-app-bridge.patch
         ./asteroidos-sync-time-default.patch

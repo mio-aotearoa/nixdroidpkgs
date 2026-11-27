@@ -5,6 +5,7 @@
   gradle_8_12_1,
   stdenv,
   fetchFromGitHub,
+  protobuf_31,
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
@@ -86,6 +87,8 @@ let
 
         cp -r ${javasteamSrc} JavaSteam
         chmod -R +w JavaSteam
+        substituteInPlace JavaSteam/build.gradle.kts \
+          --replace-fail 'artifact = libs.protobuf.protoc.get().toString()' 'path = "${protobuf_31}/bin/protoc"'
         echo "includeBuild(\"JavaSteam\")" | cat - settings.gradle.kts > temp && mv temp settings.gradle.kts
       '';
 

@@ -3,8 +3,6 @@
   lib,
   path,
   symlinkJoin,
-  runCommand,
-  patchelf,
   jdk21_headless,
   jdk25_headless,
   gradle_9_7_1,
@@ -16,6 +14,8 @@
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
   nix-update,
+  protobuf,
+  protoc-gen-grpc-java,
 }:
 let
   appPackage = stdenv.mkDerivation (
@@ -118,32 +118,6 @@ let
         hash = "sha256-HO07y5CZDVuefJGoqk/zqSJJdtWCpm5ggQ+EHdzVq7E=";
       };
 
-      protocRaw = fetchurl {
-        url = "https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.33.0/protoc-4.33.0-linux-x86_64.exe";
-        hash = "sha256-hV7KEg7atA7WEfKzpdolplTSL6THV94SjH4d+3DE1Oc=";
-      };
-
-      patchedProtoc = runCommand "protoc-4.33.0" { } ''
-        install -Dm755 "${protocRaw}" "$out"
-      '';
-
-      protocGenGrpcRaw = fetchurl {
-        url = "https://repo.maven.apache.org/maven2/io/grpc/protoc-gen-grpc-java/1.84.0/protoc-gen-grpc-java-1.84.0-linux-x86_64.exe";
-        hash = "sha256-kHwtTvwrrpshytp1wxs284IeFbe+ljEeIUpr5lvNIKo=";
-      };
-
-      patchedProtocGenGrpc =
-        runCommand "protoc-gen-grpc-java-1.84.0"
-          {
-            nativeBuildInputs = [ patchelf ];
-          }
-          ''
-            install -Dm755 "${protocGenGrpcRaw}" "$out"
-            patchelf --page-size 2097152 \
-                     --set-interpreter $(cat ${stdenv.cc}/nix-support/dynamic-linker) \
-                     --set-rpath ${lib.makeLibraryPath [ stdenv.cc.cc.lib ]} \
-                     "$out"
-          '';
     in
     {
       pname = "koiterminal";
@@ -168,10 +142,10 @@ let
         substituteInPlace tools/build_fake_sdk.sh \
           --replace-fail '#!/bin/sh' '#!${stdenv.shell}'
         substituteInPlace app/build.gradle.kts \
-          --replace-fail 'artifact = "com.google.protobuf:protoc:4.33.0"' 'path = "${patchedProtoc}"'
+          --replace-fail 'artifact = "com.google.protobuf:protoc:4.33.0"' 'path = "${protobuf}/bin/protoc"'
         substituteInPlace libs_debian_service/build.gradle.kts \
-          --replace-fail 'artifact = "com.google.protobuf:protoc:4.33.0"' 'path = "${patchedProtoc}"' \
-          --replace-fail 'artifact = "io.grpc:protoc-gen-grpc-java:1.84.0"' 'path = "${patchedProtocGenGrpc}"'
+          --replace-fail 'artifact = "com.google.protobuf:protoc:4.33.0"' 'path = "${protobuf}/bin/protoc"' \
+          --replace-fail 'artifact = "io.grpc:protoc-gen-grpc-java:1.84.0"' 'path = "${protoc-gen-grpc-java}/bin/protoc-gen-grpc-java"'
       '';
 
       gradleBuildTask = ":app:assembleRelease";

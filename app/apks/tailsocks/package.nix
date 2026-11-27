@@ -34,6 +34,7 @@ let
 
   androidSdkRoot = "${androidSdk}/share/android-sdk";
   androidNdkRoot = "${androidSdkRoot}/ndk/28.2.13676358";
+  androidNdkHost = if stdenv.hostPlatform.isDarwin then "darwin-x86_64" else "linux-x86_64";
   aapt2 = "${androidSdkRoot}/build-tools/36.0.0/aapt2";
 
   gradle = gradle_9_2_1;
@@ -240,7 +241,7 @@ let
         goarch=$(abi_goarch "$abi")
         suffix=$(abi_suffix "$abi")
         gomobile_targets="''${gomobile_targets:+$gomobile_targets,}android/$goarch"
-        export CC="${androidNdkRoot}/toolchains/llvm/prebuilt/linux-x86_64/bin/$(abi_clang "$abi")-clang"
+        export CC="${androidNdkRoot}/toolchains/llvm/prebuilt/${androidNdkHost}/bin/$(abi_clang "$abi")-clang"
         export CGO_ENABLED=1
         if [ "$goarch" = arm ]; then export GOARM=7; else unset GOARM; fi
         echo "-> Compiling tailscaled with the CLI [$abi]"

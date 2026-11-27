@@ -8,6 +8,7 @@
   fetchFromGitHub,
   go,
   gitMinimal,
+  cacert,
 
   writableTmpDirAsHomeHook,
   androidSdkBuilder,
@@ -62,7 +63,7 @@ let
         outputHashAlgo = "sha256";
         outputHash =
           if stdenv.hostPlatform.isDarwin then
-            "sha256-QLC5T608hbX3hoQiHGq5TpPKlfTtJJLUVCedW83cm5Q="
+            "sha256-hrDjGioFzgxDWUdWxQKaUF3DzvGLklt5hagB1XWTAlk="
           else
             "sha256-4o9EGVYSmDXf2qpID+ZWUjDP6YSV6PzpE1URcfRzuj0=";
         dontConfigure = true;
@@ -78,6 +79,7 @@ let
           export GOMODCACHE="$TMPDIR/go-mod-cache"
           export GOPROXY=https://proxy.golang.org,direct
           export GOSUMDB=off
+          export SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
           export CGO_ENABLED=0
 
           cp -R "$src" source
