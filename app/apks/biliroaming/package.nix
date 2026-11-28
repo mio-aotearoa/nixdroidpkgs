@@ -6,6 +6,7 @@
   gradle_8_12,
   androidSdkBuilder,
   jdk17_headless,
+  protobuf_25,
   writableTmpDirAsHomeHook,
   nix-update-script,
 }:
@@ -53,6 +54,8 @@ stdenv.mkDerivation (finalAttrs: {
 
   postPatch = ''
     find . -name "*.orig" -delete
+    substituteInPlace app/build.gradle.kts \
+      --replace-fail 'artifact = libs.protobuf.protoc.get().toString()' 'path = "${protobuf_25}/bin/protoc"'
     substituteInPlace \
       app/src/main/jni/CMakeLists.txt \
       app/src/main/jni/dex_builder/CMakeLists.txt \

@@ -364,9 +364,6 @@
   "com/google/protobuf#protoc/3.24.4": {
    "pom": "sha256-7hzQHeIAgoWyScYQOjvXUUL6OUqwRhevGPdb2BqhV2M="
   },
-  "com/google/protobuf/protoc/3.24.4/protoc-3.24.4-osx-aarch_64": {
-   "exe": "sha256-/JFZO3UapOSiKi/wM7Q4MRUO5RjWG4TljiVLy/g2mj0="
-  },
   "com/googlecode/javaewah#JavaEWAH/1.2.3": {
    "jar": "sha256-1lImlJcTxMYaeE9BxRFn57Axb5N2Q5jrup5DNrPZVMI=",
    "pom": "sha256-5O1sZpYgNm+ZOSBln+CsfLyD11PbwNwOseUplzr5byM="
