@@ -3,21 +3,21 @@
 # adapted from https://github.com/zjs81/meshcore-open, MIT license)
 # and set downstream defaults: enabled by default, 5 retries, max slider 10.
 diff --git a/lib/connector/meshcore_connector.dart b/lib/connector/meshcore_connector.dart
-index 79c7e01..3365daa 100644
+index 96ec3ec5..94b04366 100644
 --- a/lib/connector/meshcore_connector.dart
 +++ b/lib/connector/meshcore_connector.dart
-@@ -21,6 +21,7 @@ import '../models/otp_sync_status.dart';
- import '../models/path_selection.dart';
+@@ -24,6 +24,7 @@ import '../models/path_selection.dart';
+ import '../models/send_attempt_plan.dart';
  import '../models/translation_support.dart';
  import '../helpers/reaction_helper.dart';
 +import '../helpers/channel_resend_coverage.dart';
- import '../helpers/cyr2lat.dart';
- import '../helpers/smaz.dart';
- import '../storage/otp_pad_store.dart';
-@@ -9024,20 +9025,20 @@ class MeshCoreConnector extends ChangeNotifier {
-       channel.index,
-       wireTextForRadio,
-     );
+ import '../helpers/contact_share_message.dart';
+ import '../helpers/edit_helper.dart';
+ import '../helpers/gif_helper.dart';
+@@ -9400,20 +9401,20 @@ class MeshCoreConnector extends ChangeNotifier {
+         : wireText;
+     final prepared = prepareChannelOutbound(channel.index, wireTextForRadio);
+     final outboundText = prepared.text;
 -    // MeshCore Open TAK: no "resend until heard" (upstream's channel min-hops
 -    // resend): Keymind Cascade repeaters make it unneeded, and its extra
 -    // copies cost airtime. Its settings are kept but no longer shown or read.
@@ -49,7 +49,7 @@ index 79c7e01..3365daa 100644
      try {
        await transmit();
      } catch (_) {
-@@ -9048,6 +9049,92 @@ class MeshCoreConnector extends ChangeNotifier {
+@@ -9424,6 +9425,92 @@ class MeshCoreConnector extends ChangeNotifier {
        _markPendingChannelMessageFailedById(message.messageId);
        rethrow;
      }
@@ -142,7 +142,7 @@ index 79c7e01..3365daa 100644
    }
  
    final Map<String, ({int resends, int maxResends})> _channelHopChecks = {};
-@@ -9063,6 +9150,15 @@ class MeshCoreConnector extends ChangeNotifier {
+@@ -9439,6 +9526,15 @@ class MeshCoreConnector extends ChangeNotifier {
    ({int resends, int maxResends})? channelResendProgress(String messageId) =>
        _channelHopChecks[messageId];
  
@@ -159,13 +159,13 @@ index 79c7e01..3365daa 100644
    /// / RESP_CODE_CHANNEL_DATA_RECV (27) layout matches ours (v1.15.0, ver 11).
    static const int _minFirmwareVerCodeForChannelData = 11;
 diff --git a/lib/models/app_settings.dart b/lib/models/app_settings.dart
-index b46f4f1..be31bd6 100644
+index 92ba5f6d..16ba7f4a 100644
 --- a/lib/models/app_settings.dart
 +++ b/lib/models/app_settings.dart
-@@ -351,9 +351,9 @@ class AppSettings {
-     this.routeWeightSuccessIncrement = defaultRouteWeightSuccessIncrement,
-     this.routeWeightFailureDecrement = defaultRouteWeightFailureDecrement,
-     this.maxMessageRetries = defaultMaxMessageRetries,
+@@ -388,9 +388,9 @@ class AppSettings {
+     this.loginAttempts = defaultLoginAttempts,
+     this.clockSyncAfterLogin = false,
+     this.loginPasswordAutofocus = false,
 -    this.channelMinHopsEnabled = false,
 +    this.channelMinHopsEnabled = true,
      this.channelMinHops = 2,
@@ -174,10 +174,10 @@ index b46f4f1..be31bd6 100644
      this.channelMinHopsCountRepeaters = false,
      this.themeMode = 'system',
      this.redLight = false,
-@@ -648,9 +648,9 @@ class AppSettings {
-           defaultRouteWeightFailureDecrement,
-       maxMessageRetries:
-           json['max_message_retries'] as int? ?? defaultMaxMessageRetries,
+@@ -700,9 +700,9 @@ class AppSettings {
+       clockSyncAfterLogin: json['clock_sync_after_login'] as bool? ?? false,
+       loginPasswordAutofocus:
+           json['login_password_autofocus'] as bool? ?? false,
 -      channelMinHopsEnabled: json['channel_min_hops_enabled'] as bool? ?? false,
 +      channelMinHopsEnabled: json['channel_min_hops_enabled'] as bool? ?? true,
        channelMinHops: json['channel_min_hops'] as int? ?? 2,
@@ -187,13 +187,15 @@ index b46f4f1..be31bd6 100644
            json['channel_min_hops_count_repeaters'] as bool? ?? false,
        themeMode: json['theme_mode'] as String? ?? 'system',
 diff --git a/lib/screens/app_settings_screen.dart b/lib/screens/app_settings_screen.dart
-index ab27765..6949509 100644
+index e99454bb..d6af511f 100644
 --- a/lib/screens/app_settings_screen.dart
 +++ b/lib/screens/app_settings_screen.dart
-@@ -706,6 +706,67 @@ class AppSettingsScreen extends StatelessWidget {
-                 )
-               : const SizedBox.shrink(),
+@@ -520,8 +520,67 @@ class AppSettingsScreen extends StatelessWidget {
+             );
+           },
          ),
+-        // MeshCore Open TAK leaves out upstream's "Resend channel messages
+-        // until they travel far enough" (Keymind Cascade makes it unneeded).
 +        const Divider(height: 1, indent: 16),
 +        SwitchListTile(
 +          contentPadding: const EdgeInsets.symmetric(
@@ -255,14 +257,14 @@ index ab27765..6949509 100644
 +            onChanged: settingsService.setChannelMinHopsCountRepeaters,
 +          ),
 +        ],
-       ],
-     );
-   }
+         const Divider(height: 1, indent: 16),
+         ListTile(
+           contentPadding: const EdgeInsets.symmetric(
 diff --git a/lib/services/app_settings_service.dart b/lib/services/app_settings_service.dart
-index 5d6800a..4c7ab2d 100644
+index 08a5f806..c276ceda 100644
 --- a/lib/services/app_settings_service.dart
 +++ b/lib/services/app_settings_service.dart
-@@ -68,18 +68,6 @@ class AppSettingsService extends ChangeNotifier {
+@@ -71,18 +71,6 @@ class AppSettingsService extends ChangeNotifier {
      }
      _syncDateTimer();
      unawaited(ScreenAwakeService.instance.apply(_settings.keepScreenOn));

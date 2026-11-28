@@ -209,7 +209,8 @@ let
         codecSources = { inherit ncnnSource aeicSource sqliteAndroid; };
         updateScript = writeShellScriptBin "update-meshcore-open" ''
           set -euo pipefail
-          package_file="app/apks/meshcore-open/package.nix"
+          # version, rev and source hash live in common.nix (shared with app/ios).
+          package_file="app/apks/meshcore-open/common.nix"
           package_attr=".#apk_meshcore-open"
           fake_hash="${lib.fakeHash}"
 
