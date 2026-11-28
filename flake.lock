@@ -480,11 +480,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795156234,
-        "narHash": "sha256-SkW7jklno2bHSY8wpDxItWo11qYOsiGslRhd8AnsWIk=",
+        "lastModified": 1795869336,
+        "narHash": "sha256-5QknGgKXL4iW55KZyuQYaQlkIqI5D6z+UDlblBGNfvk=",
         "owner": "mio-19",
         "repo": "robotnix",
-        "rev": "37559b717be1bb4d2d18b41c1a699723e61cf421",
+        "rev": "a5c4f03c2b58af87b98b7dd8a06121ec28063e05",
         "type": "github"
       },
       "original": {
