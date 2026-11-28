@@ -1,6 +1,6 @@
 { fetchFromGitHub }:
 let
-  version = "99.0.4+1402";
+  version = "99.0.4+1403";
 in
 {
   inherit version;
@@ -9,8 +9,8 @@ in
     owner = "jade-on-mesh";
     repo = "meshcore-open-tak";
     # latest-build is a moving tag; pin the release commit for reproducibility.
-    rev = "907114945a3b56fc63727541e0da8532636d728b";
-    hash = "sha256-Sbbp4ge9N5CFN0KeFV8KBW8K9cnUKXB4QdSpPN7ExCk=";
+    rev = "58b3500af4c9403a1bc4ed73b8bf163e1588122f";
+    hash = "sha256-Goa+QzULAmFpbvqovDHq/V65N/nPdNYiGnvlKx4VbII=";
   };
 
   # Shared with the iOS package so platform builds carry the same downstream
